@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { startLiveListener, registerCompletionProvider } from './listener/liveEditorListener';
 import { openExamplePanel } from './panel/examplePanel';
 
+
 export function activate(context: vscode.ExtensionContext) {
   console.log('AI Helper activado');
 
