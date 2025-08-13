@@ -1,71 +1,47 @@
-# ai-mechanic README
+# AI Helper (DeepSeek) para VS Code
 
-This is the README for your extension "ai-mechanic". After writing up a brief description, we recommend including the following sections.
+Esta extensión de Visual Studio Code analiza código Python en tiempo real y utiliza el modelo Kimi de DeepSeek para ofrecer sugerencias y autocompletado.
 
-## Features
+## Funcionalidades principales
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Escucha en vivo**: [`listener/liveEditorListener`](src/listener/liveEditorListener.ts) observa los cambios en el editor y solicita sugerencias al servicio para mostrarlas como diagnósticos y decoraciones en la línea.
+- **Autocompletado**: el mismo módulo registra un proveedor de completado que inserta sugerencias de la IA cuando se escribe `.`.
+- **Cliente de API**: [`deepseek/client`](src/deepseek/client.ts) envía el código al endpoint `https://api.moonshot.ai/v1/chat/completions` usando la variable de entorno `KIMI_API_KEY`.
+- **Registro de eventos**: [`utils/logger`](src/utils/logger.ts) añade un prefijo uniforme a los mensajes de consola.
 
-For example if there is an image subfolder under your extension project workspace:
+## Requisitos
 
-\!\[feature X\]\(images/feature-x.png\)
+- Node.js 20 o superior.
+- Una clave válida de la API de Kimi (`KIMI_API_KEY`) definida en el entorno o en un archivo `.env`.
+- VS Code 1.102+
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Uso
 
-## Requirements
+1. Instala las dependencias: `npm install`.
+2. Compila la extensión: `npm run compile`.
+3. Presiona `F5` en VS Code para abrir una ventana de desarrollo con la extensión.
+4. Abre un archivo Python y comienza a escribir; aparecerán diagnósticos y sugerencias de completado.
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## Estructura del código
 
-## Extension Settings
+```
+src/
+  extension.ts              # Punto de entrada de la extensión
+  listener/
+    liveEditorListener.ts   # Suscribe eventos y autocompletado
+  deepseek/
+    client.ts               # Cliente HTTPS para el servicio de sugerencias
+  utils/
+    logger.ts               # Función de logging
+  test/
+    simpleApi.test.ts       # Prueba de integración de la API
+```
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## Scripts disponibles
 
-For example:
+- `npm run lint`: ejecuta ESLint sobre `src`.
+- `npm test`: compila y ejecuta las pruebas con Mocha.
 
-This extension contributes the following settings:
+## Notas
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Este proyecto está en desarrollo y se proporciona sin garantía alguna.
