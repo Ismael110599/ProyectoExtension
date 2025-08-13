@@ -10,7 +10,9 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:python"
+    "onLanguage:python",
+    "onCommand:ai-mechanic.openExampleValidator",
+    "onView:ai-mechanic.tutorView"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -18,8 +20,30 @@
       {
         "command": "ai-mechanic.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "ai-mechanic.openExampleValidator",
+        "title": "Abrir Validador de Ejemplos"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiMechanic",
+          "title": "AI Mechanic",
+          "icon": "./media/tutor.svg"
+        }
+      ]
+    },
+    "views": {
+      "aiMechanic": [
+        {
+          "type": "webview",
+          "id": "ai-mechanic.tutorView",
+          "name": "Tutor Python"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
