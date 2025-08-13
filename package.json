@@ -11,8 +11,6 @@
   ],
   "activationEvents": [
     "onLanguage:python",
-    "onCommand:ai-mechanic.openExampleValidator",
-    "onView:ai-mechanic.tutorView"
   ],
   "main": "./dist/extension.js",
   "contributes": {
