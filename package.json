@@ -10,7 +10,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:python"
+    "onLanguage:python",
+    "onCommand:ai-mechanic.openExampleValidator"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -18,6 +19,10 @@
       {
         "command": "ai-mechanic.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "ai-mechanic.openExampleValidator",
+        "title": "Abrir Validador de Ejemplos"
       }
     ]
   },
