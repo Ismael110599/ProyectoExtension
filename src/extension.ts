@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { startLiveListener, registerCompletionProvider } from './listener/liveEditorListener';
 import { openExamplePanel } from './panel/examplePanel';
+import { openChatPanel } from './panel/chatPanel';
 import { TutorViewProvider } from './panel/tutorView';
 
 
@@ -18,6 +19,11 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ai-mechanic.openExampleValidator', () =>
       openExamplePanel(context)
+    )
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ai-mechanic.openChat', () =>
+      openChatPanel(context)
     )
   );
 
