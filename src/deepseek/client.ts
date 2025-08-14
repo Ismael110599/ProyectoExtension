@@ -4,6 +4,17 @@ import * as dotenv from 'dotenv';
 dotenv.config(); // Cargar variables desde .env
 
 const API_URL = 'https://api.deepseek.com/v1/chat/completions';
+const MODEL = 'deepseek-chat'; // Modelo responsivo de DeepSeek
+
+let apiKey = process.env.DEEPSEEK_API_KEY || '';
+
+export function setApiKey(key: string) {
+  apiKey = key;
+}
+
+export function hasApiKey(): boolean {
+  return apiKey.length > 0;
+}
 
 interface Message {
   role: 'user' | 'system' | 'assistant';
@@ -14,8 +25,13 @@ type LessonLevel = 'principiante' | 'intermedio';
 
 async function callApi(messages: Message[]): Promise<string> {
   return new Promise((resolve) => {
+    if (!apiKey) {
+      resolve('Error: falta la API key de DeepSeek');
+      return;
+    }
+
     const data = JSON.stringify({
-      model: 'deepseek-chat', // Modelo de DeepSeek
+      model: MODEL,
       messages,
       stream: false,
     });
@@ -23,7 +39,7 @@ async function callApi(messages: Message[]): Promise<string> {
     const options = {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, // API key desde .env
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(data),
       },
