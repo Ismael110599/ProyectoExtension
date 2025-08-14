@@ -278,7 +278,10 @@ async function callApi(messages) {
 }
 async function getSuggestions(code) {
     const response = await callApi([
-        { role: 'system', content: 'Responde únicamente en español latinoamericano.' },
+        {
+            role: 'system',
+            content: 'Responde únicamente en español latinoamericano.',
+        },
         { role: 'user', content: code },
     ]);
     return [response];
@@ -934,30 +937,37 @@ class TutorViewProvider {
     resolveWebviewView(webviewView) {
         webviewView.webview.options = { enableScripts: true };
         webviewView.webview.html = this.getHtml(webviewView.webview);
+        const conversation = [];
         webviewView.webview.onDidReceiveMessage(async (message) => {
             if (message.command === 'chooseLevel') {
-                conversation.length = 0;
-                conversation.push({
-                    role: 'system',
-                    content: 'Responde únicamente en español latinoamericano.',
-                });
-                const content = await (0, client_1.getLesson)(message.level);
-                conversation.push({ role: 'assistant', content });
-                webviewView.webview.postMessage({
-                    command: 'addMessage',
-                    who: 'assistant',
-                    text: content,
-                });
+                try {
+                    conversation.length = 0;
+                    const content = await (0, client_1.getLesson)(message.level);
+                    conversation.push({ role: 'assistant', content });
+                    webviewView.webview.postMessage({
+                        command: 'addMessage',
+                        who: 'assistant',
+                        text: content,
+                    });
+                }
+                catch (error) {
+                    vscode.window.showErrorMessage(`Error al obtener la lección: ${error.message}`);
+                }
             }
             else if (message.command === 'sendMessage') {
-                conversation.push({ role: 'user', content: message.text });
-                const reply = await (0, client_1.chat)(conversation);
-                conversation.push({ role: 'assistant', content: reply });
-                webviewView.webview.postMessage({
-                    command: 'addMessage',
-                    who: 'assistant',
-                    text: reply,
-                });
+                try {
+                    conversation.push({ role: 'user', content: message.text });
+                    const reply = await (0, client_1.chat)(conversation);
+                    conversation.push({ role: 'assistant', content: reply });
+                    webviewView.webview.postMessage({
+                        command: 'addMessage',
+                        who: 'assistant',
+                        text: reply,
+                    });
+                }
+                catch (error) {
+                    vscode.window.showErrorMessage(`Error al procesar el mensaje: ${error.message}`);
+                }
             }
         });
     }
