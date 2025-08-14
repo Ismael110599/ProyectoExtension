@@ -66,6 +66,12 @@ export async function getSuggestions(code: string): Promise<string[]> {
   return [response];
 }
 
+export type ChatMessage = Message;
+export async function chat(messages: ChatMessage[]): Promise<string> {
+  return callApi(messages);
+}
+
+
 const lessonCache: Record<LessonLevel, string> = {
   principiante: `Bienvenido al nivel principiante.
 1. Repasa la sintaxis básica de Python.
