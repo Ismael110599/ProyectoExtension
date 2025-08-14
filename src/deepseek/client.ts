@@ -1,6 +1,9 @@
 import * as https from 'https';
+import * as dotenv from 'dotenv';
 
-const API_URL = 'https://api.moonshot.ai/v1/chat/completions';
+dotenv.config(); // Cargar variables desde .env
+
+const API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
 interface Message {
   role: 'user' | 'system' | 'assistant';
@@ -12,7 +15,7 @@ type LessonLevel = 'principiante' | 'intermedio';
 async function callApi(messages: Message[]): Promise<string> {
   return new Promise((resolve) => {
     const data = JSON.stringify({
-      model: 'kimi-k2-0711-preview',
+      model: 'deepseek-chat', // Modelo de DeepSeek
       messages,
       stream: false,
     });
@@ -20,7 +23,7 @@ async function callApi(messages: Message[]): Promise<string> {
     const options = {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.KIMI_API_KEY}`,
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, // API key desde .env
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(data),
       },
@@ -71,7 +74,6 @@ export async function chat(messages: ChatMessage[]): Promise<string> {
   return callApi(messages);
 }
 
-
 const lessonCache: Record<LessonLevel, string> = {
   principiante: `Bienvenido al nivel principiante.
 1. Repasa la sintaxis básica de Python.
@@ -92,8 +94,8 @@ export async function getLesson(level: LessonLevel): Promise<string> {
   const prompt = level === 'principiante'
     ? 'Eres una inteligencia artificial asistente experta en enseñar programación en Python. Atiendes a usuarios que no pueden escribir mensajes, solo seleccionan si están en nivel principiante o intermedio. Tu objetivo es ayudarles a desarrollar buena lógica de programación y a aprender a escribir código funcional y correcto. Responde con un mensaje inicial para un estudiante principiante: explica conceptos básicos de programación estructurada y lógica en Python con lenguaje simple, ejemplos muy sencillos paso a paso y un pequeño ejercicio.'
     : 'Eres una inteligencia artificial asistente experta en enseñar programación en Python. Atiendes a usuarios que no pueden escribir mensajes, solo seleccionan si están en nivel principiante o intermedio. Tu objetivo es ayudarles a desarrollar buena lógica de programación y a aprender a escribir código funcional y correcto. Responde con un mensaje inicial para un estudiante intermedio: refuerza conocimientos básicos, introduce programación orientada a objetos y funciones de orden superior, plantea mini-ejercicios que desarrollen la lógica y ofrece ejemplos prácticos.';
+  
   const content = await callApi([{ role: 'user', content: prompt }]);
   lessonCache[level] = content;
   return content;
 }
-
