@@ -54,7 +54,6 @@
     "lint": "eslint src",
     "test": "mocha out/test/simpleApi.test.js"
   },
-  
   "devDependencies": {
     "@types/axios": "^0.9.36",
     "@types/chai": "^5.2.2",
