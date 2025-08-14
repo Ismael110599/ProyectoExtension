@@ -1,7 +1,18 @@
 import * as vscode from 'vscode';
-import { chat, ChatMessage } from '../deepseek/client';
+import { chat, ChatMessage, setApiKey, hasApiKey } from '../deepseek/client';
 
-export function openChatPanel(context: vscode.ExtensionContext) {
+export async function openChatPanel(context: vscode.ExtensionContext) {
+  if (!hasApiKey()) {
+    const key = await vscode.window.showInputBox({
+      prompt: 'Ingresa tu DeepSeek API Key',
+      ignoreFocusOut: true,
+    });
+    if (!key) {
+      vscode.window.showErrorMessage('Se requiere una API key de DeepSeek.');
+      return;
+    }
+    setApiKey(key);
+  }
   const panel = vscode.window.createWebviewPanel(
     'aiChat',
     'Chat AI',
