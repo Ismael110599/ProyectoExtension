@@ -587,4 +587,5 @@ export class TutorViewProvider implements vscode.WebviewViewProvider {
   </script>
 </body>
 </html>`;
+  }
 }
