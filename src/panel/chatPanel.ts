@@ -26,10 +26,16 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
 
   panel.webview.onDidReceiveMessage(async (message) => {
     if (message.command === 'sendMessage') {
-      conversation.push({ role: 'user', content: message.text });
-      const reply = await chat(conversation);
-      conversation.push({ role: 'assistant', content: reply });
-      panel.webview.postMessage({ command: 'addMessage', who: 'assistant', text: reply });
+      try {
+        conversation.push({ role: 'user', content: message.text });
+        const reply = await chat(conversation);
+        conversation.push({ role: 'assistant', content: reply });
+        panel.webview.postMessage({ command: 'addMessage', who: 'assistant', text: reply });
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Error al procesar el mensaje: ${(error as Error).message}`
+        );
+      }
     }
   });
 
