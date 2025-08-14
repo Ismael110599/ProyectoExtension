@@ -10,7 +10,6 @@ export class TutorViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
-    const conversation: ChatMessage[] = [];
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
       if (message.command === 'chooseLevel') {

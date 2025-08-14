@@ -277,7 +277,10 @@ async function callApi(messages) {
     });
 }
 async function getSuggestions(code) {
-    const response = await callApi([{ role: 'user', content: code }]);
+    const response = await callApi([
+        { role: 'system', content: 'Responde únicamente en español latinoamericano.' },
+        { role: 'user', content: code },
+    ]);
     return [response];
 }
 async function chat(messages) {
@@ -931,10 +934,13 @@ class TutorViewProvider {
     resolveWebviewView(webviewView) {
         webviewView.webview.options = { enableScripts: true };
         webviewView.webview.html = this.getHtml(webviewView.webview);
-        const conversation = [];
         webviewView.webview.onDidReceiveMessage(async (message) => {
             if (message.command === 'chooseLevel') {
                 conversation.length = 0;
+                conversation.push({
+                    role: 'system',
+                    content: 'Responde únicamente en español latinoamericano.',
+                });
                 const content = await (0, client_1.getLesson)(message.level);
                 conversation.push({ role: 'assistant', content });
                 webviewView.webview.postMessage({

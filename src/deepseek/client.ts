@@ -81,7 +81,13 @@ async function callApi(messages: Message[]): Promise<string> {
 }
 
 export async function getSuggestions(code: string): Promise<string[]> {
-  const response = await callApi([{ role: 'user', content: code }]);
+  const response = await callApi([
+    {
+      role: 'system',
+      content: 'Responde únicamente en español latinoamericano.',
+    },
+    { role: 'user', content: code },
+  ]);
   return [response];
 }
 
