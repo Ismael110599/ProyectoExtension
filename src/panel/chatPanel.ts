@@ -61,12 +61,14 @@ function getWebviewContent(): string {
   <script>
     const vscode = acquireVsCodeApi();
     const messagesDiv = document.getElementById('messages');
+    let pendingDiv = null;
 
     document.getElementById('send').addEventListener('click', () => {
       const input = document.getElementById('text');
       const text = input.value;
       if (!text) { return; }
       appendMessage('user', text);
+      pendingDiv = appendMessage('assistant', 'Procesando respuesta...');
       vscode.postMessage({ command: 'sendMessage', text });
       input.value = '';
     });
@@ -74,7 +76,12 @@ function getWebviewContent(): string {
     window.addEventListener('message', event => {
       const message = event.data;
       if (message.command === 'addMessage') {
-        appendMessage(message.who, message.text);
+        if (pendingDiv) {
+          pendingDiv.textContent = message.text;
+          pendingDiv = null;
+        } else {
+          appendMessage(message.who, message.text);
+        }
       }
     });
 
@@ -84,6 +91,7 @@ function getWebviewContent(): string {
       div.textContent = text;
       messagesDiv.appendChild(div);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      return div;
     }
   </script>
 </body>
