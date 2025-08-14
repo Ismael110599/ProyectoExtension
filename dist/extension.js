@@ -44,14 +44,11 @@ exports.deactivate = deactivate;
 const vscode = __importStar(__webpack_require__(1));
 const liveEditorListener_1 = __webpack_require__(2);
 const examplePanel_1 = __webpack_require__(5);
-const tutorView_1 = __webpack_require__(6);
 function activate(context) {
     console.log('AI Helper activado');
     (0, liveEditorListener_1.startLiveListener)(context);
     (0, liveEditorListener_1.registerCompletionProvider)(context);
     context.subscriptions.push(vscode.commands.registerCommand('ai-mechanic.openExampleValidator', () => (0, examplePanel_1.openExamplePanel)(context)));
-    const tutorProvider = new tutorView_1.TutorViewProvider(context);
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider(tutorView_1.TutorViewProvider.viewType, tutorProvider));
     vscode.window.showInformationMessage('AI Helper listo con DeepSeek!');
 }
 function deactivate() { }
@@ -363,71 +360,6 @@ function getWebviewContent() {
 </body>
 </html>`;
 }
-
-
-/***/ }),
-/* 6 */
-/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TutorViewProvider = void 0;
-const client_1 = __webpack_require__(3);
-class TutorViewProvider {
-    context;
-    static viewType = 'ai-mechanic.tutorView';
-    constructor(context) {
-        this.context = context;
-    }
-    resolveWebviewView(webviewView) {
-        webviewView.webview.options = { enableScripts: true };
-        webviewView.webview.html = this.getHtml();
-        webviewView.webview.onDidReceiveMessage(async (message) => {
-            if (message.command === 'chooseLevel') {
-                const content = await (0, client_1.getLesson)(message.level);
-                webviewView.webview.postMessage({ command: 'showLesson', content });
-            }
-        });
-    }
-    getHtml() {
-        return `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: sans-serif; padding: 10px; }
-    button { margin-right: 8px; }
-    #content { white-space: pre-wrap; margin-top: 10px; }
-  </style>
-</head>
-<body>
-  <h3>Asistente de Python</h3>
-  <div id="level">
-    <p>Selecciona tu nivel:</p>
-    <button id="beginner">Principiante</button>
-    <button id="intermediate">Intermedio</button>
-  </div>
-  <div id="content"></div>
-  <script>
-    const vscode = acquireVsCodeApi();
-    document.getElementById('beginner').addEventListener('click', () => {
-      vscode.postMessage({ command: 'chooseLevel', level: 'principiante' });
-    });
-    document.getElementById('intermediate').addEventListener('click', () => {
-      vscode.postMessage({ command: 'chooseLevel', level: 'intermedio' });
-    });
-    window.addEventListener('message', event => {
-      const message = event.data;
-      if (message.command === 'showLesson') {
-        document.getElementById('content').textContent = message.content;
-      }
-    });
-  </script>
-</body>
-</html>`;
-    }
-}
-exports.TutorViewProvider = TutorViewProvider;
 
 
 /***/ })
