@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { startLiveListener, registerCompletionProvider } from './listener/liveEditorListener';
 import { openExamplePanel } from './panel/examplePanel';
+import { openChatPanel } from './panel/chatPanel';
 import { TutorViewProvider } from './panel/tutorView';
 
 
