@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { startLiveListener, registerCompletionProvider } from './listener/liveEditorListener';
 import { openExamplePanel } from './panel/examplePanel';
+import { TutorViewProvider } from './panel/tutorView';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -8,6 +9,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   startLiveListener(context);
   registerCompletionProvider(context);
+
+  const tutorProvider = new TutorViewProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(TutorViewProvider.viewType, tutorProvider)
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('ai-mechanic.openExampleValidator', () =>
