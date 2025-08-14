@@ -21,12 +21,6 @@ export function activate(context: vscode.ExtensionContext) {
       openExamplePanel(context)
     )
   );
-  context.subscriptions.push(
-    vscode.commands.registerCommand('ai-mechanic.openChat', () =>
-      openChatPanel(context)
-    )
-  );
-
   vscode.window.showInformationMessage('AI Helper listo con DeepSeek!');
 }
 
