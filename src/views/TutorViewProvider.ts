@@ -10,20 +10,10 @@ export class TutorViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
-    const conversation: ChatMessage[] = [
-      {
-        role: 'system',
-        content: 'Responde únicamente en español latinoamericano.',
-      },
-    ];
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
       if (message.command === 'chooseLevel') {
         conversation.length = 0;
-        conversation.push({
-          role: 'system',
-          content: 'Responde únicamente en español latinoamericano.',
-        });
         const content = await getLesson(message.level);
         conversation.push({ role: 'assistant', content });
         webviewView.webview.postMessage({

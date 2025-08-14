@@ -934,10 +934,6 @@ class TutorViewProvider {
     resolveWebviewView(webviewView) {
         webviewView.webview.options = { enableScripts: true };
         webviewView.webview.html = this.getHtml(webviewView.webview);
-        const conversation = [{
-                role: 'system',
-                content: 'Responde únicamente en español latinoamericano.',
-            }];
         webviewView.webview.onDidReceiveMessage(async (message) => {
             if (message.command === 'chooseLevel') {
                 conversation.length = 0;
