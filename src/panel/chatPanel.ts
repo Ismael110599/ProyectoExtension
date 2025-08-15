@@ -4,11 +4,11 @@ import { chat, ChatMessage, setApiKey, hasApiKey } from '../deepseek/client';
 export async function openChatPanel(context: vscode.ExtensionContext) {
   if (!hasApiKey()) {
     const key = await vscode.window.showInputBox({
-      prompt: 'Ingresa tu DeepSeek API Key',
+      prompt: 'Ingresa tu Kimi API Key',
       ignoreFocusOut: true,
     });
     if (!key) {
-      vscode.window.showErrorMessage('Se requiere una API key de DeepSeek.');
+      vscode.window.showErrorMessage('Se requiere una API key de Kimi.');
       return;
     }
     setApiKey(key);
@@ -26,10 +26,16 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
 
   panel.webview.onDidReceiveMessage(async (message) => {
     if (message.command === 'sendMessage') {
-      conversation.push({ role: 'user', content: message.text });
-      const reply = await chat(conversation);
-      conversation.push({ role: 'assistant', content: reply });
-      panel.webview.postMessage({ command: 'addMessage', who: 'assistant', text: reply });
+      try {
+        conversation.push({ role: 'user', content: message.text });
+        const reply = await chat(conversation);
+        conversation.push({ role: 'assistant', content: reply });
+        panel.webview.postMessage({ command: 'addMessage', who: 'assistant', text: reply });
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Error al procesar el mensaje: ${(error as Error).message}`
+        );
+      }
     }
   });
 
@@ -42,13 +48,35 @@ function getWebviewContent(): string {
 <head>
   <meta charset="UTF-8">
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 10px; }
-    #messages { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 5px; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #messages {
+      flex: 1;
+      border: 1px solid #ccc;
+      overflow-y: auto;
+      padding: 10px;
+    }
     .message { margin: 5px 0; }
     .user { text-align: right; color: blue; }
     .assistant { text-align: left; color: green; }
-    #input { display: flex; margin-top: 10px; }
-    #input input { flex: 1; }
+    #input {
+      display: flex;
+      padding: 10px;
+    }
+    #input input {
+      flex: 1;
+      padding: 8px;
+    }
+    #input button {
+      margin-left: 10px;
+    }
   </style>
 </head>
 <body>
@@ -76,11 +104,12 @@ function getWebviewContent(): string {
     window.addEventListener('message', event => {
       const message = event.data;
       if (message.command === 'addMessage') {
+        const clean = markdownToText(message.text);
         if (pendingDiv) {
-          pendingDiv.textContent = message.text;
+          pendingDiv.textContent = clean;
           pendingDiv = null;
         } else {
-          appendMessage(message.who, message.text);
+          appendMessage(message.who, clean);
         }
       }
     });
@@ -92,6 +121,22 @@ function getWebviewContent(): string {
       messagesDiv.appendChild(div);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
       return div;
+    }
+
+    function markdownToText(md) {
+      return md
+        .replace(/\x60{3}[\s\S]*?\x60{3}/g, (m) => m.replace(/\x60{3}/g, ''))
+        .replace(/\x60([^\x60]+)\x60/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/_([^_]+)_/g, '$1')
+        .replace(/~~([^~]+)~~/g, '$1')
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/^>\s?/gm, '')
+        .replace(/^[*-]\s+/gm, '')
+        .trim();
     }
   </script>
 </body>

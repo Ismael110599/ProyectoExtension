@@ -9,27 +9,39 @@ export class TutorViewProvider implements vscode.WebviewViewProvider {
   resolveWebviewView(webviewView: vscode.WebviewView) {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.getHtml(webviewView.webview);
-
+    const conversation: ChatMessage[] = [];
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
       if (message.command === 'chooseLevel') {
-        conversation.length = 0;
-        const content = await getLesson(message.level);
-        conversation.push({ role: 'assistant', content });
-        webviewView.webview.postMessage({
-          command: 'addMessage',
-          who: 'assistant',
-          text: content,
-        });
+        try {
+          conversation.length = 0;
+          const content = await getLesson(message.level);
+          conversation.push({ role: 'assistant', content });
+          webviewView.webview.postMessage({
+            command: 'addMessage',
+            who: 'assistant',
+            text: content,
+          });
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Error al obtener la lección: ${(error as Error).message}`
+          );
+        }
       } else if (message.command === 'sendMessage') {
-        conversation.push({ role: 'user', content: message.text });
-        const reply = await chat(conversation);
-        conversation.push({ role: 'assistant', content: reply });
-        webviewView.webview.postMessage({
-          command: 'addMessage',
-          who: 'assistant',
-          text: reply,
-        });
+        try {
+          conversation.push({ role: 'user', content: message.text });
+          const reply = await chat(conversation);
+          conversation.push({ role: 'assistant', content: reply });
+          webviewView.webview.postMessage({
+            command: 'addMessage',
+            who: 'assistant',
+            text: reply,
+          });
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Error al procesar el mensaje: ${(error as Error).message}`
+          );
+        }
       }
     });
   }
