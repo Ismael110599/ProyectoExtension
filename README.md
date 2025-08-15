@@ -1,6 +1,6 @@
-# AI Helper (Kimi) para VS Code
+# AI Helper (DeepSeek) para VS Code
 
-Esta extensión de Visual Studio Code analiza código Python en tiempo real y utiliza el modelo Kimi para ofrecer sugerencias y autocompletado.
+Esta extensión de Visual Studio Code analiza código Python en tiempo real y utiliza el modelo Kimi de DeepSeek para ofrecer sugerencias y autocompletado.
 
 ## Funcionalidades principales
 

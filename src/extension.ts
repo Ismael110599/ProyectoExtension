@@ -21,7 +21,7 @@ export function activate(context: vscode.ExtensionContext) {
       openExamplePanel(context)
     )
   );
-  vscode.window.showInformationMessage('AI Helper listo con Kimi!');
+  vscode.window.showInformationMessage('AI Helper listo con DeepSeek!');
 }
 
 export function deactivate() {}
