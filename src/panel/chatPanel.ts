@@ -29,24 +29,16 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
       try {
         conversation.push({ role: 'user', content: message.text });
 
-        // Llamada a chat esperando un JSON
-        const rawReply = await chat(conversation);
+        // Obtener respuesta en texto plano del chat
+        const reply = await chat(conversation);
 
-        let parsedReply: any;
-        try {
-          parsedReply = JSON.parse(rawReply);
-        } catch {
-          vscode.window.showErrorMessage('Error: la respuesta no es un JSON válido.');
-          return;
-        }
+        conversation.push({ role: 'assistant', content: reply });
 
-        conversation.push({ role: 'assistant', content: JSON.stringify(parsedReply, null, 2) });
-
-        // Mandar el JSON parseado al frontend
+        // Enviar texto procesado al frontend
         panel.webview.postMessage({
           command: 'addMessage',
           who: 'assistant',
-          json: parsedReply
+          text: reply
         });
 
       } catch (error) {
@@ -117,7 +109,7 @@ function getWebviewContent(): string {
   </style>
 </head>
 <body>
-  <h3 style="padding:10px;background:#222;margin:0;color:#fff">Chat con AI (JSON)</h3>
+  <h3 style="padding:10px;background:#222;margin:0;color:#fff">Chat con AI</h3>
   <div id="messages"></div>
   <div id="input">
     <input id="text" type="text" placeholder="Escribe un mensaje" />
@@ -141,19 +133,48 @@ function getWebviewContent(): string {
     window.addEventListener('message', event => {
       const message = event.data;
       if (message.command === 'addMessage') {
-        if (message.json) {
-          appendMessage(message.who, JSON.stringify(message.json, null, 2));
+        if (message.text) {
+          appendMessage(message.who, message.text);
         } else {
           appendMessage(message.who, '[Respuesta vacía]');
         }
       }
     });
 
+    function formatMessage(text) {
+      const regex = /\`\`\`([\s\S]*?)\`\`\`/g;
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push({ type: 'text', content: text.slice(lastIndex, match.index).trim() });
+        }
+        parts.push({ type: 'code', content: match[1].trim() });
+        lastIndex = match.index + match[0].length;
+      }
+      if (lastIndex < text.length) {
+        parts.push({ type: 'text', content: text.slice(lastIndex).trim() });
+      }
+      return parts;
+    }
+
     function appendMessage(who, text) {
-      const div = document.createElement('pre');
-      div.className = 'message ' + who;
-      div.textContent = text;
-      messagesDiv.appendChild(div);
+      const container = document.createElement('div');
+      container.className = 'message ' + who;
+      const parts = formatMessage(text);
+      parts.forEach(part => {
+        if (part.type === 'code') {
+          const pre = document.createElement('pre');
+          pre.textContent = part.content;
+          container.appendChild(pre);
+        } else if (part.content) {
+          const p = document.createElement('div');
+          p.textContent = part.content;
+          container.appendChild(p);
+        }
+      });
+      messagesDiv.appendChild(container);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
   </script>
