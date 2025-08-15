@@ -212,6 +212,7 @@ exports.hasApiKey = hasApiKey;
 exports.getSuggestions = getSuggestions;
 exports.chat = chat;
 exports.getLesson = getLesson;
+exports.analyzeAcademicPerformance = analyzeAcademicPerformance;
 const https = __importStar(__webpack_require__(4));
 const dotenv = __importStar(__webpack_require__(5));
 dotenv.config(); // Cargar variables desde .env
@@ -273,18 +274,6 @@ function parseAIResponse(rawResponse) {
 // Función para crear prompts que soliciten JSON
 function createJSONPrompt(userMessage, level, responseType = 'chat') {
     const baseJSONInstruction = `
-Responde ÚNICAMENTE en formato JSON con esta estructura exacta:
-{
-  "type": "text" | "code" | "lesson" | "error",
-  "content": "texto principal de la respuesta aquí",
-  "metadata": {
-    "language": "string opcional (ej: python)",
-    "difficulty": "beginner" | "intermediate" | "advanced",
-    "topic": "string opcional",
-    "examples": ["ejemplo 1", "ejemplo 2"],
-    "tips": ["tip 1", "tip 2"]
-  }
-}
 
 IMPORTANTE: 
 - No incluyas texto fuera del JSON
@@ -522,6 +511,95 @@ function formatResponseForDisplay(response) {
         }
     }
     return result.trim();
+}
+// Construcción del prompt avanzado para análisis FODA
+function buildAcademicPrompt(nombreCarrera, datosNotas) {
+    let prompt = (`Analizar detalladamente el desempeño académico de los estudiantes en la asignatura de ${nombreCarrera}. ` +
+        `Utilizar como fuente de información las actividades registradas en la plataforma institucional LMS UIDE Canvas. ` +
+        `Realizar un análisis FODA (Fortalezas, Oportunidades, Debilidades y Amenazas) basado en sus resultados, ` +
+        `rúbricas de evaluación, comentarios recibidos, participación y progreso en cada componente. ` +
+        `Presentar los hallazgos de forma clara, estructurada y categorizada por estudiante. ` +
+        `Incluir recomendaciones específicas y accionables, orientadas a mejorar el proceso de enseñanza-aprendizaje, ` +
+        `tanto a nivel individual como grupal.` +
+        "\n\nIMPORTANTE: Tu respuesta DEBE ser un JSON válido con la siguiente estructura:\n" +
+        "{\n" +
+        '  "resumen_general": {\n' +
+        '    "promedio_grupo": 0,\n' +
+        '    "total_estudiantes": 0,\n' +
+        '    "nivel_riesgo_grupo": "string",\n' +
+        '    "estado_general_grupo": "string"\n' +
+        '  },\n' +
+        '  "estudiantes": [\n' +
+        '    {\n' +
+        '      "nombre": "string",\n' +
+        '      "curso": "string",\n' +
+        '      "promedio": 0,\n' +
+        '      "nivel_riesgo": "string",\n' +
+        '      "estado_general": "string",\n' +
+        '      "probabilidad_aprobacion": 0,\n' +
+        '      "analisis_especifico": {\n' +
+        '        "fortalezas": ["string"],\n' +
+        '        "debilidades": ["string"],\n' +
+        '        "oportunidades": ["string"],\n' +
+        '        "amenazas": ["string"]\n' +
+        '      },\n' +
+        '      "recomendaciones": {\n' +
+        '        "inmediatas": ["string"],\n' +
+        '        "corto_plazo": ["string"],\n' +
+        '        "largo_plazo": ["string"]\n' +
+        '      },\n' +
+        '      "objetivo_recomendado": "string",\n' +
+        '      "estrategia_sugerida": "string",\n' +
+        '      "actividades_destacadas": [\n' +
+        '        {\n' +
+        '          "nombre": "string",\n' +
+        '          "nota": 0,\n' +
+        '          "max_nota": 0,\n' +
+        '          "porcentaje": 0,\n' +
+        '          "tipo": "string",\n' +
+        '          "comentario": "string"\n' +
+        '        }\n' +
+        '      ]\n' +
+        '    }\n' +
+        '  ],\n' +
+        '  "recomendaciones_grupales": {\n' +
+        '    "mejoras_metodologicas": ["string"],\n' +
+        '    "recursos_sugeridos": ["string"],\n' +
+        '    "actividades_complementarias": ["string"]\n' +
+        '  }\n' +
+        "}\n\n" +
+        "DATOS DEL ESTUDIANTE:\n");
+    for (const estudiante of datosNotas) {
+        prompt += `\n👤 ESTUDIANTE: ${estudiante.nombre_estudiante}\n`;
+        prompt += `📘 CURSO: ${estudiante.curso}\n`;
+        prompt += `📊 PROMEDIO ACTUAL: ${estudiante.promedio ?? 0}%\n`;
+        prompt += `📝 ACTIVIDADES EVALUADAS: ${estudiante.actividades_con_nota ?? 0}/${estudiante.total_actividades ?? 0}\n\n`;
+        prompt += '📋 DETALLE DE ACTIVIDADES:\n';
+        for (const act of estudiante.actividades || []) {
+            const porcentaje = act.nota != null && act.max_nota ? (act.nota / act.max_nota) * 100 : 0;
+            prompt += `  • ${act.nombre} (${act.tipo.toUpperCase()}): ${act.nota ?? 'N/A'}/${act.max_nota ?? 'N/A'} (${Math.round(porcentaje * 10) / 10}%)\n`;
+        }
+        prompt += '\n';
+    }
+    return prompt;
+}
+const systemAcademicPrompt = 'Eres un experto analista educativo especializado en evaluación del rendimiento académico universitario. ' +
+    'Tu análisis debe ser preciso, constructivo y motivacional. Utiliza un lenguaje claro y profesional, ' +
+    'pero accesible para estudiantes y docentes. \n\nOBLIGATORIO: Tu respuesta DEBE ser un JSON válido con la estructura especificada. ' +
+    'No incluyas texto adicional fuera del JSON. Asegúrate de que el JSON sea válido y completo.';
+async function analyzeAcademicPerformance(nombreCarrera, datosNotas) {
+    try {
+        const userPrompt = buildAcademicPrompt(nombreCarrera, datosNotas);
+        const messages = [
+            { role: 'system', content: systemAcademicPrompt },
+            { role: 'user', content: userPrompt }
+        ];
+        const raw = await callApi(messages);
+        return JSON.parse(raw);
+    }
+    catch (error) {
+        return { error: `Error en el análisis: ${error.message}` };
+    }
 }
 
 
