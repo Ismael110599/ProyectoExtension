@@ -248,14 +248,6 @@ function getWebviewContent(): string {
     #input button:hover {
       background: #29b6f6;
     }
-    pre {
-      background-color: #121212;
-      color: #dcdcdc;
-      padding: 10px;
-      border-radius: 5px;
-      overflow-x: auto;
-      margin: 10px 0;
-    }
   </style>
 </head>
 <body>
@@ -298,45 +290,10 @@ function getWebviewContent(): string {
       }
     });
 
-    function formatMessage(text) {
-      // Detectar bloques de código con triple backticks
-      const regex = /\`\`\`([\\s\\S]*?)\`\`\`/g;
-      const parts = [];
-      let lastIndex = 0;
-      let match;
-      
-      while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-          parts.push({ type: 'text', content: text.slice(lastIndex, match.index).trim() });
-        }
-        parts.push({ type: 'code', content: match[1].trim() });
-        lastIndex = match.index + match[0].length;
-      }
-      
-      if (lastIndex < text.length) {
-        parts.push({ type: 'text', content: text.slice(lastIndex).trim() });
-      }
-      
-      return parts.length > 0 ? parts : [{ type: 'text', content: text }];
-    }
-
     function appendMessage(who, text, isProcessing = false) {
-      const container = document.createElement('div');  
+      const container = document.createElement('div');
       container.className = 'message ' + who + (isProcessing ? ' processing' : '');
-
-      const parts = formatMessage(text);
-      parts.forEach(part => {
-        if (part.type === 'code' && part.content) {
-          const pre = document.createElement('pre');
-          pre.textContent = part.content;
-          container.appendChild(pre);
-        } else if (part.content) {
-          const div = document.createElement('div');
-          div.textContent = part.content;
-          container.appendChild(div);
-        }
-      });
-
+      container.textContent = text;
       messagesDiv.appendChild(container);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
@@ -344,25 +301,10 @@ function getWebviewContent(): string {
     function replaceLastMessage(who, text) {
       const messages = messagesDiv.querySelectorAll('.message.' + who);
       const lastMessage = messages[messages.length - 1];
-      
+
       if (lastMessage) {
-        // Limpiar el contenido anterior
-        lastMessage.innerHTML = '';
+        lastMessage.textContent = text;
         lastMessage.className = 'message ' + who; // Remover clase 'processing'
-
-        const parts = formatMessage(text);
-        parts.forEach(part => {
-          if (part.type === 'code' && part.content) {
-            const pre = document.createElement('pre');
-            pre.textContent = part.content;
-            lastMessage.appendChild(pre);
-          } else if (part.content) {
-            const div = document.createElement('div');
-            div.textContent = part.content;
-            lastMessage.appendChild(div);
-          }
-        });
-
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       } else {
         // Si no hay mensaje anterior, crear uno nuevo
