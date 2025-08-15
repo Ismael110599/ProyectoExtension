@@ -66,16 +66,17 @@ function extractContentFromJson(text: string): string {
     if (obj?.type && obj?.content) {
       let result = '';
 
-      if (obj.type === 'lesson' || obj.type === 'text') {
-        result = obj.content;
-      } else if (obj.type === 'code') {
+      if (obj.type === 'code') {
         const lang = obj.metadata?.language || '';
         result = `\`\`\`${lang}\n${obj.content}\n\`\`\``;
-      } else if (obj.type === 'error') {
-        result = `❌ Error: ${obj.content}`;
+      } else {
+        result = obj.content;
       }
 
-      // Agregar ejemplos si vienen en metadata
+      if (obj.metadata?.difficulty) {
+        result += `\n\n(Dificultad: ${obj.metadata.difficulty})`;
+      }
+
       if (obj.metadata?.examples && obj.metadata.examples.length > 0) {
         result += '\n\n## Ejemplos:\n';
         obj.metadata.examples.forEach((ex: string, idx: number) => {
@@ -83,12 +84,12 @@ function extractContentFromJson(text: string): string {
         });
       }
 
-      // Agregar tips si vienen en metadata
       if (obj.metadata?.tips && obj.metadata.tips.length > 0) {
-        result += '\n\n## Consejos:\n';
+        result += '\n\n💡 Tips:\n\n';
         obj.metadata.tips.forEach((tip: string) => {
-          result += `\n- ${tip}`;
+          result += `${tip}\n\n`;
         });
+        result = result.trimEnd();
       }
 
       return result;
