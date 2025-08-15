@@ -80,6 +80,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "dotenv": "^17.2.1"
+    "dotenv": "^17.2.1",
+    "marked": "^16.1.2"
   }
 }

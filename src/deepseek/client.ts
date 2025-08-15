@@ -6,7 +6,7 @@ dotenv.config(); // Cargar variables desde .env
 const API_URL = 'https://api.deepseek.com/v1/chat/completions';
 const MODEL = 'deepseek-chat'; // Modelo responsivo de DeepSeek
 
-let apiKey = process.env.DEEPSEEK_API_KEY || '';
+let apiKey = process.env.DEEPSEEK_API_KEY || 'sk-6e0340ecb3cb4a62bed1b117238ee5f4';
 
 export function setApiKey(key: string) {
   apiKey = key;
@@ -21,12 +21,133 @@ interface Message {
   content: string;
 }
 
-type LessonLevel = 'principiante' | 'intermedio';
+type LessonLevel = 'principiante' | 'intermedio' | 'beginner' | 'intermediate';
+
+// Estructura de respuesta AI esperada
+export interface AIResponse {
+  type: 'text' | 'code' | 'lesson' | 'error';
+  content: string;
+  metadata?: {
+    language?: string;
+    difficulty?: 'beginner' | 'intermediate' | 'advanced';
+    topic?: string;
+    examples?: string[];
+    tips?: string[];
+  };
+}
+
+// Función para validar si es JSON válido
+function isValidJSON(str: string): boolean {
+  try {
+    JSON.parse(str);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Función para validar estructura de respuesta AI
+function validateAIResponse(obj: any): obj is AIResponse {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.type === 'string' &&
+    ['text', 'code', 'lesson', 'error'].includes(obj.type) &&
+    typeof obj.content === 'string'
+  );
+}
+
+// Función para parsear respuesta de la AI
+function parseAIResponse(rawResponse: string): AIResponse {
+  // Intentar parsear como JSON
+  if (isValidJSON(rawResponse)) {
+    try {
+      const parsed = JSON.parse(rawResponse);
+      if (validateAIResponse(parsed)) {
+        return parsed;
+      } else {
+        console.warn('Respuesta JSON no tiene la estructura esperada:', parsed);
+        // Fallback: convertir a formato esperado
+        return {
+          type: 'text',
+          content: typeof parsed === 'string' ? parsed : rawResponse
+        };
+      }
+    } catch (error) {
+      console.error('Error al parsear JSON:', error);
+    }
+  }
+
+  // Fallback: tratar como texto plano
+  return {
+    type: 'text',
+    content: rawResponse
+  };
+}
+
+// Función para crear prompts que soliciten JSON
+function createJSONPrompt(userMessage: string, level?: string, responseType: 'lesson' | 'chat' = 'chat'): Message[] {
+  const baseJSONInstruction = `
+IMPORTANTE: Responde SIEMPRE en formato JSON válido con esta estructura:
+{
+  "type": "text|code|lesson|error",
+  "content": "tu respuesta aquí (puede usar markdown)",
+  "metadata": {
+    "language": "python" (si aplica),
+    "difficulty": "${level || 'beginner'}",
+    "topic": "tema principal" (opcional),
+    "examples": ["ejemplo1", "ejemplo2"] (opcional para código),
+    "tips": ["consejo1", "consejo2"] (opcional)
+  }
+}
+
+Nivel del estudiante: ${level || 'no especificado'}
+Responde en español latinoamericano, de manera clara y didáctica.
+`;
+
+  if (responseType === 'lesson') {
+    return [
+      {
+        role: 'system',
+        content: `${baseJSONInstruction}
+
+Eres un tutor experto en Python. Genera una lección estructurada para el nivel ${level}. 
+El tipo debe ser "lesson" y el contenido debe incluir explicaciones claras, ejemplos prácticos y ejercicios.`
+      },
+      {
+        role: 'user',
+        content: userMessage
+      }
+    ];
+  } else {
+    return [
+      {
+        role: 'system',
+        content: `${baseJSONInstruction}
+
+Eres un asistente experto en Python. Analiza el código o pregunta del estudiante y responde con:
+- "code" si estás mostrando código
+- "text" si es explicación general
+- "lesson" si es contenido educativo estructurado
+- "error" si hay un problema
+
+Si revisas código, identifica errores y explica cómo corregirlos sin generar código completo nuevo.`
+      },
+      {
+        role: 'user',
+        content: userMessage
+      }
+    ];
+  }
+}
 
 async function callApi(messages: Message[]): Promise<string> {
   return new Promise((resolve) => {
     if (!apiKey) {
-      resolve('Error: falta la API key de DeepSeek');
+      resolve(JSON.stringify({
+        type: 'error',
+        content: 'Error: falta la API key de DeepSeek'
+      }));
       return;
     }
 
@@ -52,7 +173,10 @@ async function callApi(messages: Message[]): Promise<string> {
         try {
           const parsed = JSON.parse(body);
           if (parsed.error) {
-            resolve(`API Error: ${parsed.error.message}`);
+            resolve(JSON.stringify({
+              type: 'error',
+              content: `API Error: ${parsed.error.message}`
+            }));
           } else if (
             parsed.choices &&
             parsed.choices.length > 0 &&
@@ -61,18 +185,27 @@ async function callApi(messages: Message[]): Promise<string> {
           ) {
             resolve(parsed.choices[0].message.content);
           } else {
-            resolve('Error: Unexpected API response format');
+            resolve(JSON.stringify({
+              type: 'error',
+              content: 'Error: Unexpected API response format'
+            }));
           }
         } catch (e) {
           console.error('Error parsing DeepSeek response:', e);
-          resolve('Error: Failed to parse API response');
+          resolve(JSON.stringify({
+            type: 'error',
+            content: 'Error: Failed to parse API response'
+          }));
         }
       });
     });
 
     req.on('error', (error) => {
       console.error('Error en DeepSeek:', error);
-      resolve('Error al obtener sugerencias de DeepSeek');
+      resolve(JSON.stringify({
+        type: 'error',
+        content: 'Error al conectar con DeepSeek'
+      }));
     });
 
     req.write(data);
@@ -81,43 +214,215 @@ async function callApi(messages: Message[]): Promise<string> {
 }
 
 export async function getSuggestions(code: string): Promise<string[]> {
-  const response = await callApi([
-    {
-      role: 'system',
-      content: 'Responde únicamente en español latinoamericano.',
-    },
-    { role: 'user', content: code },
-  ]);
-  return [response];
+  const messages = createJSONPrompt(`Revisa este código de Python: ${code}`, 'intermediate', 'chat');
+  const response = await callApi(messages);
+  const parsedResponse = parseAIResponse(response);
+  return [formatResponseForDisplay(parsedResponse)];
 }
 
 export type ChatMessage = Message;
+
 export async function chat(messages: ChatMessage[]): Promise<string> {
-  return callApi(messages);
+  try {
+    // Obtener el último mensaje del usuario para contexto
+    const lastUserMessage = messages[messages.length - 1];
+    const userLevel = inferLevelFromConversation(messages);
+    
+    // Crear prompt con formato JSON
+    const jsonMessages = createJSONPrompt(
+      lastUserMessage?.content || '', 
+      userLevel, 
+      'chat'
+    );
+    
+    // Añadir contexto de conversación previa (sin el prompt de sistema)
+    const conversationHistory = messages.slice(0, -1); // Todos menos el último
+    const finalMessages = [
+      ...jsonMessages.slice(0, 1), // Sistema
+      ...conversationHistory.slice(-4), // Últimos 4 mensajes de contexto
+      ...jsonMessages.slice(1) // Usuario actual
+    ];
+    
+    const rawResponse = await callApi(finalMessages);
+    const parsedResponse = parseAIResponse(rawResponse);
+    
+    return formatResponseForDisplay(parsedResponse);
+    
+  } catch (error) {
+    console.error('Error en chat:', error);
+    return JSON.stringify({
+      type: 'error',
+      content: `Error en el chat: ${(error as Error).message}`
+    });
+  }
 }
 
-const lessonCache: Record<LessonLevel, string> = {
-  principiante: `Bienvenido al nivel principiante.
-1. Repasa la sintaxis básica de Python.
-2. Escribe un programa que imprima "Hola Mundo".
-3. Declara una variable y muestra su valor.
-Ejercicio: crea una función que sume dos números e imprime el resultado.`,
-  intermedio: `Bienvenido al nivel intermedio.
-1. Revisa listas y bucles.
-2. Practica funciones y argumentos.
-3. Crea una clase "Persona" con un método "saludar".
-Ejercicio: implementa un generador que produzca números pares.`
-};
+// Cache de lecciones actualizado
+const lessonCache: Record<string, string> = {};
 
 export async function getLesson(level: LessonLevel): Promise<string> {
-  if (lessonCache[level]) {
-    return lessonCache[level];
-  }
-  const prompt = level === 'principiante'
-    ? 'Eres una inteligencia artificial asistente experta en enseñar programación en Python. Atiendes a usuarios que no pueden escribir mensajes, solo seleccionan si están en nivel principiante o intermedio. Tu objetivo es ayudarles a desarrollar buena lógica de programación y a aprender a escribir código funcional y correcto. Responde con un mensaje inicial para un estudiante principiante: explica conceptos básicos de programación estructurada y lógica en Python con lenguaje simple, ejemplos muy sencillos paso a paso y un pequeño ejercicio.'
-    : 'Eres una inteligencia artificial asistente experta en enseñar programación en Python. Atiendes a usuarios que no pueden escribir mensajes, solo seleccionan si están en nivel principiante o intermedio. Tu objetivo es ayudarles a desarrollar buena lógica de programación y a aprender a escribir código funcional y correcto. Responde con un mensaje inicial para un estudiante intermedio: refuerza conocimientos básicos, introduce programación orientada a objetos y funciones de orden superior, plantea mini-ejercicios que desarrollen la lógica y ofrece ejemplos prácticos.';
+  // Normalizar nivel
+  const normalizedLevel = level === 'beginner' ? 'principiante' : 
+                         level === 'intermediate' ? 'intermedio' : level;
   
-  const content = await callApi([{ role: 'user', content: prompt }]);
-  lessonCache[level] = content;
-  return content;
+  const cacheKey = `lesson_${normalizedLevel}`;
+  
+  if (lessonCache[cacheKey]) {
+    return lessonCache[cacheKey];
+  }
+
+  try {
+    const lessonPrompt = normalizedLevel === 'principiante' 
+      ? `Genera una lección de Python para principiantes que cubra:
+- Sintaxis básica y variables
+- Tipos de datos (int, str, bool)
+- Operaciones básicas
+- Estructura condicional simple (if/else)
+- Un ejercicio práctico sencillo
+Incluye ejemplos de código y consejos útiles.`
+
+      : `Genera una lección de Python para nivel intermedio que cubra:
+- Listas, diccionarios y métodos
+- Funciones con parámetros y return
+- Programación orientada a objetos básica (clases)
+- Manejo de errores try/except
+- Un ejercicio práctico con clase
+Incluye ejemplos de código y mejores prácticas.`;
+
+    const messages = createJSONPrompt(lessonPrompt, normalizedLevel, 'lesson');
+    const rawResponse = await callApi(messages);
+    const parsedResponse = parseAIResponse(rawResponse);
+    
+    const formattedLesson = formatResponseForDisplay(parsedResponse);
+    lessonCache[cacheKey] = formattedLesson;
+    
+    return formattedLesson;
+    
+  } catch (error) {
+    console.error('Error al obtener lección:', error);
+    
+    // Fallback a lecciones estáticas
+    const fallbackLessons = {
+      principiante: `# 🐍 Lección de Python - Nivel Principiante
+
+## Bienvenido al mundo de Python
+
+### 1. Variables y Tipos de Datos
+En Python puedes crear variables muy fácilmente:
+\`\`\`python
+nombre = "María"          # String (texto)
+edad = 25                # Integer (número entero)
+es_estudiante = True     # Boolean (verdadero/falso)
+\`\`\`
+
+### 2. Operaciones Básicas
+\`\`\`python
+suma = 10 + 5           # 15
+mensaje = "Hola " + nombre  # "Hola María"
+\`\`\`
+
+### 3. Ejercicio Práctico
+Crea un programa que:
+1. Defina tu nombre en una variable
+2. Defina tu edad en otra variable  
+3. Imprima un mensaje de presentación
+
+¡Inténtalo y pregúntame si necesitas ayuda!`,
+
+      intermedio: `# 🐍 Lección de Python - Nivel Intermedio
+
+## Conceptos Avanzados
+
+### 1. Listas y Métodos
+\`\`\`python
+numeros = [1, 2, 3, 4, 5]
+numeros.append(6)        # Agregar elemento
+print(len(numeros))      # Longitud: 6
+\`\`\`
+
+### 2. Funciones
+\`\`\`python
+def calcular_promedio(lista):
+    return sum(lista) / len(lista)
+
+promedio = calcular_promedio([8, 9, 7, 10])
+\`\`\`
+
+### 3. Clases Básicas
+\`\`\`python
+class Persona:
+    def __init__(self, nombre):
+        self.nombre = nombre
+    
+    def saludar(self):
+        return f"Hola, soy {self.nombre}"
+\`\`\`
+
+### 4. Ejercicio Práctico
+Crea una clase "Calculadora" con métodos para sumar, restar, multiplicar y dividir.
+
+¡Comparte tu código para revisarlo juntos!`
+    };
+    
+    return fallbackLessons[normalizedLevel as keyof typeof fallbackLessons] || 
+           'Error al cargar la lección. Intenta nuevamente.';
+  }
+}
+
+// Función auxiliar para inferir nivel del usuario desde la conversación
+function inferLevelFromConversation(messages: ChatMessage[]): string {
+  // Buscar indicadores de nivel en los mensajes
+  const conversationText = messages.map(m => m.content).join(' ').toLowerCase();
+  
+  if (conversationText.includes('principiante') || conversationText.includes('beginner')) {
+    return 'principiante';
+  }
+  if (conversationText.includes('intermedio') || conversationText.includes('intermediate')) {
+    return 'intermedio';
+  }
+  
+  // Por defecto, asumir principiante
+  return 'principiante';
+}
+
+// Función para formatear respuesta para mostrar
+function formatResponseForDisplay(response: AIResponse): string {
+  switch (response.type) {
+    case 'code':
+      let codeFormatted = response.content;
+      if (response.metadata?.language) {
+        // Si no está ya formateado con markdown, agregarlo
+        if (!codeFormatted.includes('```')) {
+          codeFormatted = `\`\`\`${response.metadata.language}\n${codeFormatted}\n\`\`\``;
+        }
+      }
+      return codeFormatted;
+    
+    case 'lesson':
+      let lessonFormatted = response.content;
+      
+      // Agregar ejemplos si existen
+      if (response.metadata?.examples && response.metadata.examples.length > 0) {
+        lessonFormatted += '\n\n## 📝 Ejemplos de Código:\n';
+        response.metadata.examples.forEach((example, index) => {
+          lessonFormatted += `\n${index + 1}. \`\`\`python\n${example}\n\`\`\``;
+        });
+      }
+      
+      // Agregar consejos si existen
+      if (response.metadata?.tips && response.metadata.tips.length > 0) {
+        lessonFormatted += '\n\n## 💡 Consejos Útiles:\n';
+        response.metadata.tips.forEach(tip => {
+          lessonFormatted += `\n- ${tip}`;
+        });
+      }
+      
+      return lessonFormatted;
+    
+    case 'error':
+      return `❌ **Error**: ${response.content}`;
+    
+    default:
+      return response.content;
+  }
 }
