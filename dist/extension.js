@@ -1168,7 +1168,8 @@ class TutorViewProvider {
             else if (message.command === 'sendMessage') {
                 try {
                     conversation.push({ role: 'user', content: message.text });
-                    const reply = await (0, client_1.chat)(conversation);
+                    const aiResponse = await (0, client_1.chat)(conversation);
+                    const reply = formatAIResponse(aiResponse);
                     conversation.push({ role: 'assistant', content: reply });
                     webviewView.webview.postMessage({
                         command: 'addMessage',
@@ -1573,6 +1574,32 @@ class TutorViewProvider {
     }
 }
 exports.TutorViewProvider = TutorViewProvider;
+function formatAIResponse(response) {
+    let result = response.content;
+    if (response.metadata) {
+        if (response.metadata.difficulty) {
+            const difficultyMap = {
+                beginner: 'Principiante',
+                intermediate: 'Intermedio',
+                advanced: 'Avanzado'
+            };
+            result += `\n\n(Dificultad: ${difficultyMap[response.metadata.difficulty] || response.metadata.difficulty})`;
+        }
+        if (response.metadata.examples && response.metadata.examples.length > 0) {
+            result += '\n\n📝 Ejemplos:';
+            response.metadata.examples.forEach((example, index) => {
+                result += `\n${index + 1}. ${example}`;
+            });
+        }
+        if (response.metadata.tips && response.metadata.tips.length > 0) {
+            result += '\n\n💡 Tips:';
+            response.metadata.tips.forEach(tip => {
+                result += `\n• ${tip}`;
+            });
+        }
+    }
+    return result.trim();
+}
 
 
 /***/ })

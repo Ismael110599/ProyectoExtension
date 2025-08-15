@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { chat, ChatMessage, setApiKey, hasApiKey, AIResponse } from '../deepseek/client';
+import { chat, ChatMessage, setApiKey, hasApiKey, AIResponse, analyzeAcademicPerformance, AcademicReport } from '../deepseek/client';
 
 export async function openChatPanel(context: vscode.ExtensionContext) {
   if (!hasApiKey()) {
@@ -30,16 +30,30 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
       try {
         conversation.push({ role: 'user', content: message.text });
 
-        // Obtener respuesta (ahora devuelve AIResponse directamente)
+        // Intentar interpretar el mensaje como datos académicos en JSON
+        let data: any = null;
+        try {
+          data = JSON.parse(message.text);
+        } catch {
+          data = null;
+        }
+
+        if (data && data.nombre_carrera && data.datos_notas) {
+          const report = await analyzeAcademicPerformance(data.nombre_carrera, data.datos_notas);
+          const reply = formatAcademicReport(report);
+          conversation.push({ role: 'assistant', content: reply });
+          panel.webview.postMessage({
+            command: 'replaceLastMessage',
+            who: 'assistant',
+            text: reply
+          });
+          return;
+        }
+
+        // Obtener respuesta de chat normal
         const aiResponse = await chat(conversation);
-
-        // Formatear la respuesta para mostrar
         const reply = formatAIResponse(aiResponse);
-
-        // Guardar en historial
         conversation.push({ role: 'assistant', content: reply });
-
-        // Enviar texto limpio al frontend - REEMPLAZAR el mensaje de "Procesando"
         panel.webview.postMessage({
           command: 'replaceLastMessage',
           who: 'assistant',
@@ -47,7 +61,6 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
         });
 
       } catch (error) {
-        // En caso de error, también reemplazar el mensaje de "Procesando"
         panel.webview.postMessage({
           command: 'replaceLastMessage',
           who: 'assistant',
@@ -95,6 +108,72 @@ function formatAIResponse(response: AIResponse): string {
       response.metadata.tips.forEach(tip => {
         result += `\n• ${tip}`;
       });
+    }
+  }
+
+  return result.trim();
+}
+
+function formatAcademicReport(report: AcademicReport | { error: string }): string {
+  if ((report as any).error) {
+    return `Error: ${(report as any).error}`;
+  }
+
+  let result = 'Resumen general:\n';
+  const resumen = (report as AcademicReport).resumen_general;
+  if (resumen) {
+    result += `Promedio del grupo: ${resumen.promedio_grupo}\n`;
+    result += `Total de estudiantes: ${resumen.total_estudiantes}\n`;
+    result += `Nivel de riesgo del grupo: ${resumen.nivel_riesgo_grupo}\n`;
+    result += `Estado general del grupo: ${resumen.estado_general_grupo}\n`;
+  }
+
+  if ((report as AcademicReport).estudiantes && (report as AcademicReport).estudiantes.length > 0) {
+    result += '\nEstudiantes:\n';
+    (report as AcademicReport).estudiantes.forEach((est: any, index: number) => {
+      result += `\n${index + 1}. ${est.nombre} - ${est.curso}\n`;
+      result += `Promedio: ${est.promedio}\n`;
+      result += `Nivel de riesgo: ${est.nivel_riesgo}\n`;
+      result += `Estado general: ${est.estado_general}\n`;
+      if (est.analisis_especifico) {
+        if (est.analisis_especifico.fortalezas?.length) {
+          result += `Fortalezas: ${est.analisis_especifico.fortalezas.join(', ')}\n`;
+        }
+        if (est.analisis_especifico.debilidades?.length) {
+          result += `Debilidades: ${est.analisis_especifico.debilidades.join(', ')}\n`;
+        }
+        if (est.analisis_especifico.oportunidades?.length) {
+          result += `Oportunidades: ${est.analisis_especifico.oportunidades.join(', ')}\n`;
+        }
+        if (est.analisis_especifico.amenazas?.length) {
+          result += `Amenazas: ${est.analisis_especifico.amenazas.join(', ')}\n`;
+        }
+      }
+      if (est.recomendaciones) {
+        if (est.recomendaciones.inmediatas?.length) {
+          result += `Recomendaciones inmediatas: ${est.recomendaciones.inmediatas.join(', ')}\n`;
+        }
+        if (est.recomendaciones.corto_plazo?.length) {
+          result += `Recomendaciones a corto plazo: ${est.recomendaciones.corto_plazo.join(', ')}\n`;
+        }
+        if (est.recomendaciones.largo_plazo?.length) {
+          result += `Recomendaciones a largo plazo: ${est.recomendaciones.largo_plazo.join(', ')}\n`;
+        }
+      }
+    });
+  }
+
+  const grupales = (report as AcademicReport).recomendaciones_grupales;
+  if (grupales) {
+    result += '\nRecomendaciones grupales:\n';
+    if (grupales.mejoras_metodologicas?.length) {
+      result += `Mejoras metodológicas: ${grupales.mejoras_metodologicas.join(', ')}\n`;
+    }
+    if (grupales.recursos_sugeridos?.length) {
+      result += `Recursos sugeridos: ${grupales.recursos_sugeridos.join(', ')}\n`;
+    }
+    if (grupales.actividades_complementarias?.length) {
+      result += `Actividades complementarias: ${grupales.actividades_complementarias.join(', ')}\n`;
     }
   }
 
