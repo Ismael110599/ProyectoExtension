@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { chat, ChatMessage, setApiKey, hasApiKey } from '../deepseek/client';
+import { chat, ChatMessage, setApiKey, hasApiKey, AIResponse } from '../deepseek/client';
 
 export async function openChatPanel(context: vscode.ExtensionContext) {
   if (!hasApiKey()) {
@@ -30,23 +30,29 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
       try {
         conversation.push({ role: 'user', content: message.text });
 
-        // Obtener respuesta cruda
-        const rawReply = await chat(conversation);
+        // Obtener respuesta (ahora devuelve AIResponse directamente)
+        const aiResponse = await chat(conversation);
 
-        // Procesar para que siempre sea texto plano
-        const reply = extractContentFromJson(rawReply);
+        // Formatear la respuesta para mostrar
+        const reply = formatAIResponse(aiResponse);
 
         // Guardar en historial
         conversation.push({ role: 'assistant', content: reply });
 
-        // Enviar texto limpio al frontend
+        // Enviar texto limpio al frontend - REEMPLAZAR el mensaje de "Procesando"
         panel.webview.postMessage({
-          command: 'addMessage',
+          command: 'replaceLastMessage',
           who: 'assistant',
           text: reply
         });
 
       } catch (error) {
+        // En caso de error, también reemplazar el mensaje de "Procesando"
+        panel.webview.postMessage({
+          command: 'replaceLastMessage',
+          who: 'assistant',
+          text: `Error: ${(error as Error).message}`
+        });
         vscode.window.showErrorMessage(
           `Error al procesar el mensaje: ${(error as Error).message}`
         );
@@ -58,43 +64,41 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
 }
 
 // ============================================
-// Extraer texto de un AIResponse o texto plano
+// Formatear respuesta AI para mostrar
 // ============================================
-function extractContentFromJson(input: any): string {
-  try {
-    const obj = typeof input === 'string' ? JSON.parse(input) : input;
+function formatAIResponse(response: AIResponse): string {
+  let result = response.content;
 
-    if (obj && typeof obj === 'object' && 'type' in obj && 'content' in obj) {
-      let result = obj.content || '';
-
-      if (obj.metadata?.difficulty) {
-        result += `\n\nDificultad: ${obj.metadata.difficulty}`;
-      }
-
-      if (obj.metadata?.examples?.length) {
-        result += '\n\nEjemplos:\n';
-        obj.metadata.examples.forEach((ex: string, idx: number) => {
-          result += `${idx + 1}. ${ex}\n`;
-        });
-      }
-
-      if (obj.metadata?.tips?.length) {
-        result += '\n\nTips:\n';
-        obj.metadata.tips.forEach((tip: string) => {
-          result += `- ${tip}\n`;
-        });
-      }
-
-      return result.trim();
+  // Agregar metadata formateada
+  if (response.metadata) {
+    // Agregar dificultad si existe
+    if (response.metadata.difficulty) {
+      const difficultyMap = {
+        'beginner': 'Principiante',
+        'intermediate': 'Intermedio',
+        'advanced': 'Avanzado'
+      };
+      result += `\n\n(Dificultad: ${difficultyMap[response.metadata.difficulty] || response.metadata.difficulty})`;
     }
 
-    return typeof obj === 'string'
-      ? obj
-      : Object.values(obj).join('\n');
+    // Agregar ejemplos si existen
+    if (response.metadata.examples && response.metadata.examples.length > 0) {
+      result += '\n\n📝 Ejemplos:';
+      response.metadata.examples.forEach((example, index) => {
+        result += `\n${index + 1}. ${example}`;
+      });
+    }
 
-  } catch {
-    return String(input);
+    // Agregar tips si existen
+    if (response.metadata.tips && response.metadata.tips.length > 0) {
+      result += '\n\n💡 Tips:';
+      response.metadata.tips.forEach(tip => {
+        result += `\n• ${tip}`;
+      });
+    }
   }
+
+  return result.trim();
 }
 
 // ============================================
@@ -108,7 +112,7 @@ function getWebviewContent(): string {
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: monospace;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
       padding: 0;
       display: flex;
@@ -123,9 +127,22 @@ function getWebviewContent(): string {
       background: #1e1e1e;
       color: #dcdcdc;
     }
-    .message { margin: 5px 0; white-space: pre-wrap; }
-    .user { color: #4fc3f7; }
-    .assistant { color: #81c784; }
+    .message { 
+      margin: 10px 0; 
+      white-space: pre-wrap; 
+      line-height: 1.5;
+    }
+    .user { 
+      color: #4fc3f7; 
+      font-weight: bold;
+    }
+    .assistant { 
+      color: #81c784; 
+    }
+    .processing {
+      color: #ffa726;
+      font-style: italic;
+    }
     #input {
       display: flex;
       padding: 10px;
@@ -138,6 +155,7 @@ function getWebviewContent(): string {
       color: #fff;
       border: none;
       outline: none;
+      border-radius: 4px;
     }
     #input button {
       margin-left: 10px;
@@ -146,6 +164,10 @@ function getWebviewContent(): string {
       color: #000;
       padding: 8px 12px;
       cursor: pointer;
+      border-radius: 4px;
+    }
+    #input button:hover {
+      background: #29b6f6;
     }
     pre {
       background-color: #121212;
@@ -153,14 +175,15 @@ function getWebviewContent(): string {
       padding: 10px;
       border-radius: 5px;
       overflow-x: auto;
+      margin: 10px 0;
     }
   </style>
 </head>
 <body>
-  <h3 style="padding:10px;background:#222;margin:0;color:#fff">Chat con AI</h3>
+  <h3 style="padding:10px;background:#222;margin:0;color:#fff">💬 Chat con AI</h3>
   <div id="messages"></div>
   <div id="input">
-    <input id="text" type="text" placeholder="Escribe un mensaje" />
+    <input id="text" type="text" placeholder="Escribe un mensaje..." />
     <button id="send">Enviar</button>
   </div>
 
@@ -168,28 +191,41 @@ function getWebviewContent(): string {
     const vscode = acquireVsCodeApi();
     const messagesDiv = document.getElementById('messages');
 
-    document.getElementById('send').addEventListener('click', () => {
+    document.getElementById('send').addEventListener('click', sendMessage);
+    
+    document.getElementById('text').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    function sendMessage() {
       const input = document.getElementById('text');
-      const text = input.value;
+      const text = input.value.trim();
       if (!text) return;
+      
       appendMessage('user', text);
-      appendMessage('assistant', 'Procesando respuesta...');
+      appendMessage('assistant', 'Procesando respuesta...', true);
       vscode.postMessage({ command: 'sendMessage', text });
       input.value = '';
-    });
+    }
 
     window.addEventListener('message', event => {
       const message = event.data;
       if (message.command === 'addMessage') {
         appendMessage(message.who, message.text || '[Respuesta vacía]');
+      } else if (message.command === 'replaceLastMessage') {
+        replaceLastMessage(message.who, message.text || '[Respuesta vacía]');
       }
     });
 
     function formatMessage(text) {
-      const regex = /\\\`\\\`\\\`([\\s\\S]*?)\\\`\\\`\\\`/g;
+      // Detectar bloques de código con triple backticks
+      const regex = /\`\`\`([\\s\\S]*?)\`\`\`/g;
       const parts = [];
       let lastIndex = 0;
       let match;
+      
       while ((match = regex.exec(text)) !== null) {
         if (match.index > lastIndex) {
           parts.push({ type: 'text', content: text.slice(lastIndex, match.index).trim() });
@@ -197,31 +233,62 @@ function getWebviewContent(): string {
         parts.push({ type: 'code', content: match[1].trim() });
         lastIndex = match.index + match[0].length;
       }
+      
       if (lastIndex < text.length) {
         parts.push({ type: 'text', content: text.slice(lastIndex).trim() });
       }
-      return parts;
+      
+      return parts.length > 0 ? parts : [{ type: 'text', content: text }];
     }
 
-    function appendMessage(who, text) {
+    function appendMessage(who, text, isProcessing = false) {
       const container = document.createElement('div');  
-      container.className = 'message ' + who;
+      container.className = 'message ' + who + (isProcessing ? ' processing' : '');
 
       const parts = formatMessage(text);
       parts.forEach(part => {
-        if (part.type === 'code') {
+        if (part.type === 'code' && part.content) {
           const pre = document.createElement('pre');
           pre.textContent = part.content;
           container.appendChild(pre);
         } else if (part.content) {
-          const p = document.createElement('div');
-          p.textContent = part.content;
-          container.appendChild(p);
+          const div = document.createElement('div');
+          div.textContent = part.content;
+          container.appendChild(div);
         }
       });
 
       messagesDiv.appendChild(container);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function replaceLastMessage(who, text) {
+      const messages = messagesDiv.querySelectorAll('.message.' + who);
+      const lastMessage = messages[messages.length - 1];
+      
+      if (lastMessage) {
+        // Limpiar el contenido anterior
+        lastMessage.innerHTML = '';
+        lastMessage.className = 'message ' + who; // Remover clase 'processing'
+
+        const parts = formatMessage(text);
+        parts.forEach(part => {
+          if (part.type === 'code' && part.content) {
+            const pre = document.createElement('pre');
+            pre.textContent = part.content;
+            lastMessage.appendChild(pre);
+          } else if (part.content) {
+            const div = document.createElement('div');
+            div.textContent = part.content;
+            lastMessage.appendChild(div);
+          }
+        });
+
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      } else {
+        // Si no hay mensaje anterior, crear uno nuevo
+        appendMessage(who, text);
+      }
     }
   </script>
 </body>

@@ -91,18 +91,25 @@ function createJSONPrompt(userMessage: string, level?: string, responseType: 'le
 Responde ÚNICAMENTE en formato JSON con esta estructura exacta:
 {
   "type": "text" | "code" | "lesson" | "error",
-  "content": "texto principal",
+  "content": "texto principal de la respuesta aquí",
   "metadata": {
-    "language": "string opcional",
+    "language": "string opcional (ej: python)",
     "difficulty": "beginner" | "intermediate" | "advanced",
     "topic": "string opcional",
     "examples": ["ejemplo 1", "ejemplo 2"],
     "tips": ["tip 1", "tip 2"]
   }
 }
-No incluyas texto fuera del JSON.
 
-Nivel del estudiante: ${level || 'no especificado'}
+IMPORTANTE: 
+- No incluyas texto fuera del JSON
+- El campo "content" debe contener toda la explicación principal
+- Usa "type": "code" si muestras código Python
+- Usa "type": "text" para explicaciones generales
+- Usa "type": "lesson" para contenido educativo estructurado
+- Usa "type": "error" si hay un problema
+
+Nivel del estudiante: ${level || 'principiante'}
 Responde en español latinoamericano, de manera clara y didáctica.
 `;
 
@@ -127,12 +134,13 @@ El tipo debe ser "lesson" y el contenido debe incluir explicaciones claras, ejem
         content: `${baseJSONInstruction}
 
 Eres un asistente experto en Python. Analiza el código o pregunta del estudiante y responde con:
-- "code" si estás mostrando código
-- "text" si es explicación general
+- "code" si estás mostrando código Python
+- "text" si es explicación general o conversación
 - "lesson" si es contenido educativo estructurado
 - "error" si hay un problema
 
-Si revisas código, identifica errores y explica cómo corregirlos sin generar código completo nuevo.`
+Si revisas código, identifica errores y explica cómo corregirlos. 
+Puedes incluir ejemplos de código corregido en el campo "content" usando formato markdown con triple backticks.`
       },
       {
         role: 'user',
@@ -223,7 +231,8 @@ export async function getSuggestions(code: string): Promise<string[]> {
 
 export type ChatMessage = Message;
 
-export async function chat(messages: ChatMessage[]): Promise<string> {
+// ✅ FUNCIÓN PRINCIPAL CORREGIDA
+export async function chat(messages: ChatMessage[]): Promise<AIResponse> {
   try {
     // Obtener el último mensaje del usuario para contexto
     const lastUserMessage = messages[messages.length - 1];
@@ -247,14 +256,15 @@ export async function chat(messages: ChatMessage[]): Promise<string> {
     const rawResponse = await callApi(finalMessages);
     const parsedResponse = parseAIResponse(rawResponse);
 
-    return formatResponseForDisplay(parsedResponse);
+    // ✅ Devolver el objeto AIResponse directamente, no como string
+    return parsedResponse;
 
   } catch (error) {
     console.error('Error en chat:', error);
-    return JSON.stringify({
+    return {
       type: 'error',
       content: `Error en el chat: ${(error as Error).message}`
-    });
+    };
   }
 }
 
@@ -330,44 +340,38 @@ function inferLevelFromConversation(messages: ChatMessage[]): string {
   return 'principiante';
 }
 
-// Función para formatear respuesta para mostrar
+// ✅ FUNCIÓN DE FORMATEO MEJORADA
 function formatResponseForDisplay(response: AIResponse): string {
-  switch (response.type) {
-    case 'code':
-      let codeFormatted = response.content;
-      if (response.metadata?.language) {
-        // Si no está ya formateado con markdown, agregarlo
-        if (!codeFormatted.includes('```')) {
-          codeFormatted = `\`\`\`${response.metadata.language}\n${codeFormatted}\n\`\`\``;
-        }
-      }
-      return codeFormatted;
+  let result = response.content;
 
-    case 'lesson':
-      let lessonFormatted = response.content;
+  // Agregar metadata formateada
+  if (response.metadata) {
+    // Agregar dificultad si existe
+    if (response.metadata.difficulty) {
+      const difficultyMap = {
+        'beginner': 'Principiante',
+        'intermediate': 'Intermedio',
+        'advanced': 'Avanzado'
+      };
+      result += `\n\n(Dificultad: ${difficultyMap[response.metadata.difficulty] || response.metadata.difficulty})`;
+    }
 
-      // Agregar ejemplos si existen
-      if (response.metadata?.examples && response.metadata.examples.length > 0) {
-        lessonFormatted += '\n\n## 📝 Ejemplos de Código:\n';
-        response.metadata.examples.forEach((example, index) => {
-          lessonFormatted += `\n${index + 1}. \`\`\`python\n${example}\n\`\`\``;
-        });
-      }
+    // Agregar ejemplos si existen
+    if (response.metadata.examples && response.metadata.examples.length > 0) {
+      result += '\n\n📝 Ejemplos:';
+      response.metadata.examples.forEach((example, index) => {
+        result += `\n${index + 1}. ${example}`;
+      });
+    }
 
-      // Agregar consejos si existen
-      if (response.metadata?.tips && response.metadata.tips.length > 0) {
-        lessonFormatted += '\n\n## 💡 Consejos Útiles:\n';
-        response.metadata.tips.forEach(tip => {
-          lessonFormatted += `\n- ${tip}`;
-        });
-      }
-
-      return lessonFormatted;
-
-    case 'error':
-      return `❌ **Error**: ${response.content}`;
-
-    default:
-      return response.content;
+    // Agregar tips si existen
+    if (response.metadata.tips && response.metadata.tips.length > 0) {
+      result += '\n\n💡 Tips:';
+      response.metadata.tips.forEach(tip => {
+        result += `\n• ${tip}`;
+      });
+    }
   }
+
+  return result.trim();
 }
