@@ -13,6 +13,7 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
     }
     setApiKey(key);
   }
+
   const panel = vscode.window.createWebviewPanel(
     'aiChat',
     'Chat AI',
@@ -25,61 +26,84 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
   const conversation: ChatMessage[] = [];
 
   panel.webview.onDidReceiveMessage(async (message) => {
-  if (message.command === 'sendMessage') {
-    try {
-      conversation.push({ role: 'user', content: message.text });
+    if (message.command === 'sendMessage') {
+      try {
+        conversation.push({ role: 'user', content: message.text });
 
-      // Obtener respuesta del chat
-      let reply = await chat(conversation);
+        // Obtener respuesta del chat
+        const rawReply = await chat(conversation);
 
-      // Intentar parsear JSON a texto plano
-      reply = parseJsonToText(reply);
+        // Convertir JSON a texto plano con metadata
+        const reply = extractContentFromJson(rawReply);
 
-      conversation.push({ role: 'assistant', content: reply });
+        conversation.push({ role: 'assistant', content: reply });
 
-      // Enviar texto procesado al frontend
-      panel.webview.postMessage({
-        command: 'addMessage',
-        who: 'assistant',
-        text: reply
-      });
+        // Enviar solo texto plano al frontend
+        panel.webview.postMessage({
+          command: 'addMessage',
+          who: 'assistant',
+          text: reply
+        });
 
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `Error al procesar el mensaje: ${(error as Error).message}`
-      );
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Error al procesar el mensaje: ${(error as Error).message}`
+        );
+      }
     }
-  }
-});
+  });
 
-// Función para convertir JSON a texto plano
-function parseJsonToText(text: string): string {
-  try {
-    const obj = JSON.parse(text);
-    return formatObject(obj);
-  } catch {
-    // Si no es JSON válido, devolver tal cual
-    return text;
-  }
-}
-
-// Función recursiva para convertir objetos a texto plano
-function formatObject(obj: any, indent = 0): string {
-  const spaces = '  '.repeat(indent);
-  if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean' || obj === null) {
-    return `${spaces}${obj}`;
-  } else if (Array.isArray(obj)) {
-    return obj.map(item => formatObject(item, indent + 1)).join('\n');
-  } else if (typeof obj === 'object') {
-    return Object.entries(obj)
-      .map(([key, value]) => `${spaces}${key}: ${formatObject(value, indent + 1)}`)
-      .join('\n');
-  }
-  return `${spaces}${String(obj)}`;
-}
   context.subscriptions.push(panel);
 }
 
+// ============================================
+// Función para parsear la respuesta de la AI
+// ============================================
+function extractContentFromJson(text: string): string {
+  try {
+    const obj = JSON.parse(text);
+
+    if (obj?.type && obj?.content) {
+      let result = '';
+
+      if (obj.type === 'lesson' || obj.type === 'text') {
+        result = obj.content;
+      } else if (obj.type === 'code') {
+        const lang = obj.metadata?.language || '';
+        result = `\`\`\`${lang}\n${obj.content}\n\`\`\``;
+      } else if (obj.type === 'error') {
+        result = `❌ Error: ${obj.content}`;
+      }
+
+      // Agregar ejemplos si vienen en metadata
+      if (obj.metadata?.examples && obj.metadata.examples.length > 0) {
+        result += '\n\n## Ejemplos:\n';
+        obj.metadata.examples.forEach((ex: string, idx: number) => {
+          result += `\n${idx + 1}. \`\`\`${obj.metadata.language || 'python'}\n${ex}\n\`\`\``;
+        });
+      }
+
+      // Agregar tips si vienen en metadata
+      if (obj.metadata?.tips && obj.metadata.tips.length > 0) {
+        result += '\n\n## Consejos:\n';
+        obj.metadata.tips.forEach((tip: string) => {
+          result += `\n- ${tip}`;
+        });
+      }
+
+      return result;
+    }
+
+    // Si JSON no tiene type/content, devolver string plano
+    return JSON.stringify(obj, null, 2);
+  } catch {
+    return text; // No es JSON
+  }
+}
+
+// ============================================
+// Webview HTML
+// ============================================
 function getWebviewContent(): string {
   return `<!DOCTYPE html>
 <html lang="es">
