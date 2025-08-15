@@ -65,7 +65,7 @@ export function registerCompletionProvider(context: vscode.ExtensionContext) {
 
         return suggestions.map(suggestion => {
           const item = new vscode.CompletionItem(suggestion, vscode.CompletionItemKind.Text);
-          item.detail = 'Sugerencia AI (Kimi)';
+          item.detail = 'Sugerencia AI (DeepSeek)';
           item.insertText = suggestion;
           return item;
         });

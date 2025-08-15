@@ -3,7 +3,7 @@ import { getSuggestions } from '../deepseek/client.js'; // Importa la función g
 import * as dotenv from 'dotenv';
 dotenv.config(); // Carga las variables de entorno desde .env
 
-describe('Test de integración con la API Kimi (Simplificado)', function () {
+describe('Test de integración con la API DeepSeek (Simplificado)', function () {
   this.timeout(15000); // Timeout aumentado para llamadas a la API
 
   it('debería devolver un arreglo de sugerencias o un mensaje de error bien formateado', async () => {
