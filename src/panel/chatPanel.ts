@@ -25,30 +25,58 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
   const conversation: ChatMessage[] = [];
 
   panel.webview.onDidReceiveMessage(async (message) => {
-    if (message.command === 'sendMessage') {
-      try {
-        conversation.push({ role: 'user', content: message.text });
+  if (message.command === 'sendMessage') {
+    try {
+      conversation.push({ role: 'user', content: message.text });
 
-        // Obtener respuesta en texto plano del chat
-        const reply = await chat(conversation);
+      // Obtener respuesta del chat
+      let reply = await chat(conversation);
 
-        conversation.push({ role: 'assistant', content: reply });
+      // Intentar parsear JSON a texto plano
+      reply = parseJsonToText(reply);
 
-        // Enviar texto procesado al frontend
-        panel.webview.postMessage({
-          command: 'addMessage',
-          who: 'assistant',
-          text: reply
-        });
+      conversation.push({ role: 'assistant', content: reply });
 
-      } catch (error) {
-        vscode.window.showErrorMessage(
-          `Error al procesar el mensaje: ${(error as Error).message}`
-        );
-      }
+      // Enviar texto procesado al frontend
+      panel.webview.postMessage({
+        command: 'addMessage',
+        who: 'assistant',
+        text: reply
+      });
+
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Error al procesar el mensaje: ${(error as Error).message}`
+      );
     }
-  });
+  }
+});
 
+// Función para convertir JSON a texto plano
+function parseJsonToText(text: string): string {
+  try {
+    const obj = JSON.parse(text);
+    return formatObject(obj);
+  } catch {
+    // Si no es JSON válido, devolver tal cual
+    return text;
+  }
+}
+
+// Función recursiva para convertir objetos a texto plano
+function formatObject(obj: any, indent = 0): string {
+  const spaces = '  '.repeat(indent);
+  if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean' || obj === null) {
+    return `${spaces}${obj}`;
+  } else if (Array.isArray(obj)) {
+    return obj.map(item => formatObject(item, indent + 1)).join('\n');
+  } else if (typeof obj === 'object') {
+    return Object.entries(obj)
+      .map(([key, value]) => `${spaces}${key}: ${formatObject(value, indent + 1)}`)
+      .join('\n');
+  }
+  return `${spaces}${String(obj)}`;
+}
   context.subscriptions.push(panel);
 }
 

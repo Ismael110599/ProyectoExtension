@@ -461,64 +461,8 @@ Incluye ejemplos de código y mejores prácticas.`;
         console.error('Error al obtener lección:', error);
         // Fallback a lecciones estáticas
         const fallbackLessons = {
-            principiante: `# 🐍 Lección de Python - Nivel Principiante
-
-## Bienvenido al mundo de Python
-
-### 1. Variables y Tipos de Datos
-En Python puedes crear variables muy fácilmente:
-\`\`\`python
-nombre = "María"          # String (texto)
-edad = 25                # Integer (número entero)
-es_estudiante = True     # Boolean (verdadero/falso)
-\`\`\`
-
-### 2. Operaciones Básicas
-\`\`\`python
-suma = 10 + 5           # 15
-mensaje = "Hola " + nombre  # "Hola María"
-\`\`\`
-
-### 3. Ejercicio Práctico
-Crea un programa que:
-1. Defina tu nombre en una variable
-2. Defina tu edad en otra variable  
-3. Imprima un mensaje de presentación
-
-¡Inténtalo y pregúntame si necesitas ayuda!`,
-            intermedio: `# 🐍 Lección de Python - Nivel Intermedio
-
-## Conceptos Avanzados
-
-### 1. Listas y Métodos
-\`\`\`python
-numeros = [1, 2, 3, 4, 5]
-numeros.append(6)        # Agregar elemento
-print(len(numeros))      # Longitud: 6
-\`\`\`
-
-### 2. Funciones
-\`\`\`python
-def calcular_promedio(lista):
-    return sum(lista) / len(lista)
-
-promedio = calcular_promedio([8, 9, 7, 10])
-\`\`\`
-
-### 3. Clases Básicas
-\`\`\`python
-class Persona:
-    def __init__(self, nombre):
-        self.nombre = nombre
-    
-    def saludar(self):
-        return f"Hola, soy {self.nombre}"
-\`\`\`
-
-### 4. Ejercicio Práctico
-Crea una clase "Calculadora" con métodos para sumar, restar, multiplicar y dividir.
-
-¡Comparte tu código para revisarlo juntos!`
+            principiante: `# 🐍 Lección de Python - Nivel Principiante`,
+            intermedio: `# 🐍 Lección de Python - Nivel Intermedio`
         };
         return fallbackLessons[normalizedLevel] ||
             'Error al cargar la lección. Intenta nuevamente.';

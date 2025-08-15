@@ -227,14 +227,14 @@ export async function chat(messages: ChatMessage[]): Promise<string> {
     // Obtener el último mensaje del usuario para contexto
     const lastUserMessage = messages[messages.length - 1];
     const userLevel = inferLevelFromConversation(messages);
-    
+
     // Crear prompt con formato JSON
     const jsonMessages = createJSONPrompt(
-      lastUserMessage?.content || '', 
-      userLevel, 
+      lastUserMessage?.content || '',
+      userLevel,
       'chat'
     );
-    
+
     // Añadir contexto de conversación previa (sin el prompt de sistema)
     const conversationHistory = messages.slice(0, -1); // Todos menos el último
     const finalMessages = [
@@ -242,12 +242,12 @@ export async function chat(messages: ChatMessage[]): Promise<string> {
       ...conversationHistory.slice(-4), // Últimos 4 mensajes de contexto
       ...jsonMessages.slice(1) // Usuario actual
     ];
-    
+
     const rawResponse = await callApi(finalMessages);
     const parsedResponse = parseAIResponse(rawResponse);
-    
+
     return formatResponseForDisplay(parsedResponse);
-    
+
   } catch (error) {
     console.error('Error en chat:', error);
     return JSON.stringify({
@@ -262,17 +262,17 @@ const lessonCache: Record<string, string> = {};
 
 export async function getLesson(level: LessonLevel): Promise<string> {
   // Normalizar nivel
-  const normalizedLevel = level === 'beginner' ? 'principiante' : 
-                         level === 'intermediate' ? 'intermedio' : level;
-  
+  const normalizedLevel = level === 'beginner' ? 'principiante' :
+    level === 'intermediate' ? 'intermedio' : level;
+
   const cacheKey = `lesson_${normalizedLevel}`;
-  
+
   if (lessonCache[cacheKey]) {
     return lessonCache[cacheKey];
   }
 
   try {
-    const lessonPrompt = normalizedLevel === 'principiante' 
+    const lessonPrompt = normalizedLevel === 'principiante'
       ? `Genera una lección de Python para principiantes que cubra:
 - Sintaxis básica y variables
 - Tipos de datos (int, str, bool)
@@ -292,80 +292,24 @@ Incluye ejemplos de código y mejores prácticas.`;
     const messages = createJSONPrompt(lessonPrompt, normalizedLevel, 'lesson');
     const rawResponse = await callApi(messages);
     const parsedResponse = parseAIResponse(rawResponse);
-    
+
     const formattedLesson = formatResponseForDisplay(parsedResponse);
     lessonCache[cacheKey] = formattedLesson;
-    
+
     return formattedLesson;
-    
+
   } catch (error) {
     console.error('Error al obtener lección:', error);
-    
+
     // Fallback a lecciones estáticas
     const fallbackLessons = {
-      principiante: `# 🐍 Lección de Python - Nivel Principiante
+      principiante: `# 🐍 Lección de Python - Nivel Principiante`,
 
-## Bienvenido al mundo de Python
-
-### 1. Variables y Tipos de Datos
-En Python puedes crear variables muy fácilmente:
-\`\`\`python
-nombre = "María"          # String (texto)
-edad = 25                # Integer (número entero)
-es_estudiante = True     # Boolean (verdadero/falso)
-\`\`\`
-
-### 2. Operaciones Básicas
-\`\`\`python
-suma = 10 + 5           # 15
-mensaje = "Hola " + nombre  # "Hola María"
-\`\`\`
-
-### 3. Ejercicio Práctico
-Crea un programa que:
-1. Defina tu nombre en una variable
-2. Defina tu edad en otra variable  
-3. Imprima un mensaje de presentación
-
-¡Inténtalo y pregúntame si necesitas ayuda!`,
-
-      intermedio: `# 🐍 Lección de Python - Nivel Intermedio
-
-## Conceptos Avanzados
-
-### 1. Listas y Métodos
-\`\`\`python
-numeros = [1, 2, 3, 4, 5]
-numeros.append(6)        # Agregar elemento
-print(len(numeros))      # Longitud: 6
-\`\`\`
-
-### 2. Funciones
-\`\`\`python
-def calcular_promedio(lista):
-    return sum(lista) / len(lista)
-
-promedio = calcular_promedio([8, 9, 7, 10])
-\`\`\`
-
-### 3. Clases Básicas
-\`\`\`python
-class Persona:
-    def __init__(self, nombre):
-        self.nombre = nombre
-    
-    def saludar(self):
-        return f"Hola, soy {self.nombre}"
-\`\`\`
-
-### 4. Ejercicio Práctico
-Crea una clase "Calculadora" con métodos para sumar, restar, multiplicar y dividir.
-
-¡Comparte tu código para revisarlo juntos!`
+      intermedio: `# 🐍 Lección de Python - Nivel Intermedio`
     };
-    
-    return fallbackLessons[normalizedLevel as keyof typeof fallbackLessons] || 
-           'Error al cargar la lección. Intenta nuevamente.';
+
+    return fallbackLessons[normalizedLevel as keyof typeof fallbackLessons] ||
+      'Error al cargar la lección. Intenta nuevamente.';
   }
 }
 
@@ -373,14 +317,14 @@ Crea una clase "Calculadora" con métodos para sumar, restar, multiplicar y divi
 function inferLevelFromConversation(messages: ChatMessage[]): string {
   // Buscar indicadores de nivel en los mensajes
   const conversationText = messages.map(m => m.content).join(' ').toLowerCase();
-  
+
   if (conversationText.includes('principiante') || conversationText.includes('beginner')) {
     return 'principiante';
   }
   if (conversationText.includes('intermedio') || conversationText.includes('intermediate')) {
     return 'intermedio';
   }
-  
+
   // Por defecto, asumir principiante
   return 'principiante';
 }
@@ -397,10 +341,10 @@ function formatResponseForDisplay(response: AIResponse): string {
         }
       }
       return codeFormatted;
-    
+
     case 'lesson':
       let lessonFormatted = response.content;
-      
+
       // Agregar ejemplos si existen
       if (response.metadata?.examples && response.metadata.examples.length > 0) {
         lessonFormatted += '\n\n## 📝 Ejemplos de Código:\n';
@@ -408,7 +352,7 @@ function formatResponseForDisplay(response: AIResponse): string {
           lessonFormatted += `\n${index + 1}. \`\`\`python\n${example}\n\`\`\``;
         });
       }
-      
+
       // Agregar consejos si existen
       if (response.metadata?.tips && response.metadata.tips.length > 0) {
         lessonFormatted += '\n\n## 💡 Consejos Útiles:\n';
@@ -416,12 +360,12 @@ function formatResponseForDisplay(response: AIResponse): string {
           lessonFormatted += `\n- ${tip}`;
         });
       }
-      
+
       return lessonFormatted;
-    
+
     case 'error':
       return `❌ **Error**: ${response.content}`;
-    
+
     default:
       return response.content;
   }
