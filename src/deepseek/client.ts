@@ -88,18 +88,19 @@ function parseAIResponse(rawResponse: string): AIResponse {
 // Función para crear prompts que soliciten JSON
 function createJSONPrompt(userMessage: string, level?: string, responseType: 'lesson' | 'chat' = 'chat'): Message[] {
   const baseJSONInstruction = `
-IMPORTANTE: Responde SIEMPRE en formato JSON válido con esta estructura:
+Responde ÚNICAMENTE en formato JSON con esta estructura exacta:
 {
-  "type": "text|code|lesson|error",
-  "content": "tu respuesta aquí (puede usar markdown)",
+  "type": "text" | "code" | "lesson" | "error",
+  "content": "texto principal",
   "metadata": {
-    "language": "python" (si aplica),
-    "difficulty": "${level || 'beginner'}",
-    "topic": "tema principal" (opcional),
-    "examples": ["ejemplo1", "ejemplo2"] (opcional para código),
-    "tips": ["consejo1", "consejo2"] (opcional)
+    "language": "string opcional",
+    "difficulty": "beginner" | "intermediate" | "advanced",
+    "topic": "string opcional",
+    "examples": ["ejemplo 1", "ejemplo 2"],
+    "tips": ["tip 1", "tip 2"]
   }
 }
+No incluyas texto fuera del JSON.
 
 Nivel del estudiante: ${level || 'no especificado'}
 Responde en español latinoamericano, de manera clara y didáctica.

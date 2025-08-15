@@ -30,15 +30,16 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
       try {
         conversation.push({ role: 'user', content: message.text });
 
-        // Obtener respuesta del chat
+        // Obtener respuesta cruda
         const rawReply = await chat(conversation);
 
-        // Convertir JSON a texto plano con metadata
+        // Procesar para que siempre sea texto plano
         const reply = extractContentFromJson(rawReply);
 
+        // Guardar en historial
         conversation.push({ role: 'assistant', content: reply });
 
-        // Enviar solo texto plano al frontend
+        // Enviar texto limpio al frontend
         panel.webview.postMessage({
           command: 'addMessage',
           who: 'assistant',
@@ -57,53 +58,47 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
 }
 
 // ============================================
-// Función para parsear la respuesta de la AI
+// Extraer texto de un AIResponse o texto plano
 // ============================================
-function extractContentFromJson(text: string): string {
+function extractContentFromJson(input: any): string {
   try {
-    const obj = JSON.parse(text);
+    const obj = typeof input === 'string' ? JSON.parse(input) : input;
 
-    if (obj?.type && obj?.content) {
-      let result = '';
-
-      if (obj.type === 'code') {
-        const lang = obj.metadata?.language || '';
-        result = `\`\`\`${lang}\n${obj.content}\n\`\`\``;
-      } else {
-        result = obj.content;
-      }
+    if (obj && typeof obj === 'object' && 'type' in obj && 'content' in obj) {
+      let result = obj.content || '';
 
       if (obj.metadata?.difficulty) {
-        result += `\n\n(Dificultad: ${obj.metadata.difficulty})`;
+        result += `\n\nDificultad: ${obj.metadata.difficulty}`;
       }
 
-      if (obj.metadata?.examples && obj.metadata.examples.length > 0) {
-        result += '\n\n## Ejemplos:\n';
+      if (obj.metadata?.examples?.length) {
+        result += '\n\nEjemplos:\n';
         obj.metadata.examples.forEach((ex: string, idx: number) => {
-          result += `\n${idx + 1}. \`\`\`${obj.metadata.language || 'python'}\n${ex}\n\`\`\``;
+          result += `${idx + 1}. ${ex}\n`;
         });
       }
 
-      if (obj.metadata?.tips && obj.metadata.tips.length > 0) {
-        result += '\n\n💡 Tips:\n\n';
+      if (obj.metadata?.tips?.length) {
+        result += '\n\nTips:\n';
         obj.metadata.tips.forEach((tip: string) => {
-          result += `${tip}\n\n`;
+          result += `- ${tip}\n`;
         });
-        result = result.trimEnd();
       }
 
-      return result;
+      return result.trim();
     }
 
-    // Si JSON no tiene type/content, devolver string plano
-    return JSON.stringify(obj, null, 2);
+    return typeof obj === 'string'
+      ? obj
+      : Object.values(obj).join('\n');
+
   } catch {
-    return text; // No es JSON
+    return String(input);
   }
 }
 
 // ============================================
-// Webview HTML
+// HTML del Webview
 // ============================================
 function getWebviewContent(): string {
   return `<!DOCTYPE html>
@@ -186,16 +181,12 @@ function getWebviewContent(): string {
     window.addEventListener('message', event => {
       const message = event.data;
       if (message.command === 'addMessage') {
-        if (message.text) {
-          appendMessage(message.who, message.text);
-        } else {
-          appendMessage(message.who, '[Respuesta vacía]');
-        }
+        appendMessage(message.who, message.text || '[Respuesta vacía]');
       }
     });
 
     function formatMessage(text) {
-      const regex = /\`\`\`([\s\S]*?)\`\`\`/g;
+      const regex = /\\\`\\\`\\\`([\\s\\S]*?)\\\`\\\`\\\`/g;
       const parts = [];
       let lastIndex = 0;
       let match;
@@ -213,8 +204,9 @@ function getWebviewContent(): string {
     }
 
     function appendMessage(who, text) {
-      const container = document.createElement('div');
+      const container = document.createElement('div');  
       container.className = 'message ' + who;
+
       const parts = formatMessage(text);
       parts.forEach(part => {
         if (part.type === 'code') {
@@ -227,6 +219,7 @@ function getWebviewContent(): string {
           container.appendChild(p);
         }
       });
+
       messagesDiv.appendChild(container);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
