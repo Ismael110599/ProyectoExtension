@@ -1240,7 +1240,7 @@ class TutorViewProvider {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asistente de Python</title>
+  <link href="${styleUri}" rel="stylesheet" />
   <style>
     :root {
       /* Light Theme */
@@ -1305,17 +1305,6 @@ class TutorViewProvider {
       font-size: 20px;
       cursor: pointer;
       color: var(--text-color);
-      padding: 5px;
-      border-radius: 50%;
-      width: 34px;
-      height: 34px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .theme-toggle:hover {
-      background-color: rgba(0, 0, 0, 0.1);
     }
     
     .header h1 {
@@ -1435,19 +1424,17 @@ class TutorViewProvider {
       border-top: 1px solid var(--border-color);
       padding: 15px;
       background-color: var(--card-bg);
-      width: 100%;
     }
     
     .input-wrapper {
       display: flex;
-      align-items: center;
+      align-items: flex-end;
       gap: 10px;
       position: relative;
-      width: 100%;
     }
     
     .input-field {
-      width: 100%;
+      flex: 1;
       border: 1px solid var(--border-color);
       border-radius: 6px;
       padding: 12px 50px 12px 15px;
@@ -1455,11 +1442,10 @@ class TutorViewProvider {
       resize: none;
       min-height: 50px;
       max-height: 150px;
+      transition: all 0.2s ease;
       background-color: var(--input-bg);
       color: var(--text-color);
       overflow-y: hidden;
-      box-sizing: border-box;
-      transition: height 0.2s ease;
     }
     
     .input-field:focus {
@@ -1526,11 +1512,6 @@ class TutorViewProvider {
         padding: 15px;
       }
       
-      .header h1 {
-        font-size: 24px;
-        padding-right: 30px;
-      }
-      
       .level-buttons {
         flex-direction: column;
         gap: 12px;
@@ -1575,11 +1556,11 @@ class TutorViewProvider {
   <div class="level-selection" id="levelSelection">
     <h3>Selecciona tu nivel de experiencia</h3>
     <div class="level-buttons">
-      <button class="level-btn" data-level="beginner">
+      <button class="level-btn" id="beginner">
         <span class="level-icon">🌱</span>
         Principiante
       </button>
-      <button class="level-btn" data-level="intermediate">
+      <button class="level-btn" id="intermediate">
         <span class="level-icon">⚡</span>
         Intermedio
       </button>
@@ -1611,33 +1592,12 @@ class TutorViewProvider {
   </div>
 
   <script>
-    // VSCode API
-    const vscode = acquireVsCodeApi();
-    
     // Auto-resize textarea
     const textarea = document.getElementById('messageInput');
-    
-    function adjustTextareaHeight() {
-      textarea.style.height = 'auto';
-      const computed = window.getComputedStyle(textarea);
-      const height = parseInt(computed.getPropertyValue('border-top-width'), 10) +
-                   parseInt(computed.getPropertyValue('padding-top'), 10) +
-                   textarea.scrollHeight +
-                   parseInt(computed.getPropertyValue('padding-bottom'), 10) +
-                   parseInt(computed.getPropertyValue('border-bottom-width'), 10);
-      
-      textarea.style.height = height + 'px';
-      
-      if (height > 150) {
-        textarea.style.overflowY = 'auto';
-      } else {
-        textarea.style.overflowY = 'hidden';
-      }
-    }
-    
-    textarea.addEventListener('input', adjustTextareaHeight);
-    adjustTextareaHeight();
-    window.addEventListener('resize', adjustTextareaHeight);
+    textarea.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight) + 'px';
+    });
 
     // Theme toggle
     const themeToggle = document.getElementById('themeToggle');
@@ -1645,114 +1605,18 @@ class TutorViewProvider {
       const currentTheme = document.documentElement.getAttribute('data-theme');
       const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', newTheme);
-      vscode.setState({ theme: newTheme });
+      localStorage.setItem('theme', newTheme);
       this.textContent = newTheme === 'dark' ? '🌞' : '🌓';
     });
 
-    // Restore theme
-    const state = vscode.getState();
-    const savedTheme = state?.theme || 'light';
+    // Check for saved theme preference
+    const savedTheme = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
     themeToggle.textContent = savedTheme === 'dark' ? '🌞' : '🌓';
-
-    // Chat elements
-    const sendBtn = document.getElementById('sendBtn');
-    const messagesContainer = document.getElementById('messages');
-    const chatContainer = document.getElementById('chatContainer');
-    const levelSelection = document.getElementById('levelSelection');
-
-    // Level selection
-    document.querySelectorAll('.level-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const level = e.currentTarget.getAttribute('data-level');
-        vscode.postMessage({
-          command: 'chooseLevel',
-          level: level
-        });
-        showChat();
-      });
-    });
-
-    function showChat() {
-      levelSelection.style.display = 'none';
-      chatContainer.style.display = 'block';
-    }
-
-    function addMessage(sender, message) {
-    const emptyState = document.querySelector('.empty-state');
-    if (emptyState) emptyState.remove();
-
-    const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message');
-
-    // Detectar si el mensaje es JSON válido
-    let content = message;
-    let isJSON = false;
-    try {
-      const parsed = JSON.parse(message);
-      if (parsed && typeof parsed === 'object' && parsed.content) {
-        content = parsed.content;
-        isJSON = true;
-      }
-    } catch {}
-
-    // Estilos según tipo
-    if (sender === 'user') {
-      messageDiv.classList.add('user-message');
-    } else {
-      messageDiv.classList.add('assistant-message');
-      if (!isJSON) {
-        // Si no es JSON, poner fondo más claro y texto azul
-        messageDiv.style.backgroundColor = '#e0f7fa';
-        messageDiv.style.color = '#006064';
-      }
-    }
-
-    // Permitir texto multilínea
-    messageDiv.innerHTML = content.replace(/\n/g, '<br>');
-
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  }
-
-  // Escuchar mensajes desde la extensión
-  window.addEventListener('message', event => {
-    const message = event.data;
-    if (message.command === 'addMessage') {
-      addMessage(message.who, message.text);
-    }
-  });
-
-    // Send message
-    function sendMessage() {
-      const message = textarea.value.trim();
-      if (message) {
-        addMessage('user', message);
-        vscode.postMessage({
-          command: 'sendMessage',
-          text: message
-        });
-        textarea.value = '';
-        adjustTextareaHeight();
-      }
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    textarea.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    // Listen for messages from extension
-    window.addEventListener('message', event => {
-      const message = event.data;
-      if (message.command === 'addMessage') {
-        addMessage(message.who, message.text);
-      }
-    });
   </script>
+
+  <script src="${formatUri}"></script>
+  <script src="${appUri}"></script>
 </body>
 </html>`;
     }
