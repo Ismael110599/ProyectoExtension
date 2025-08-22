@@ -132,19 +132,32 @@ function startLiveListener(context) {
         if (!editor || editor.document !== document) {
             return;
         }
-        const text = document.getText();
-        const suggestions = await (0, client_1.getSuggestions)(text);
-        // Mostrar sugerencias como diagnóstico
-        const diagnostics = suggestions.map((suggestion, i) => {
-            return new vscode.Diagnostic(new vscode.Range(i, 0, i, 1), suggestion, vscode.DiagnosticSeverity.Information);
-        });
-        diagnosticCollection.set(document.uri, diagnostics);
-        // Mostrar sugerencias como decoración (mensaje visual)
-        const decorationOptions = suggestions.map((s, i) => ({
-            range: new vscode.Range(i, 0, i, 0),
-            hoverMessage: s
-        }));
-        editor.setDecorations(suggestionDecorationType, decorationOptions);
+        if (throttleTimer) {
+            clearTimeout(throttleTimer);
+        }
+        throttleTimer = setTimeout(async () => {
+            const lineCount = document.lineCount;
+            const suggestions = await Promise.all(Array.from({ length: lineCount }, async (_, i) => {
+                const lineText = document.lineAt(i).text;
+                if (!lineText.trim()) {
+                    return '';
+                }
+                const [suggestion] = await (0, client_1.getSuggestions)(lineText);
+                return shorten(suggestion);
+            }));
+            const diagnostics = [];
+            const decorationOptions = [];
+            suggestions.forEach((s, i) => {
+                if (!s) {
+                    return;
+                }
+                const range = new vscode.Range(i, 0, i, 1);
+                diagnostics.push(new vscode.Diagnostic(range, s, vscode.DiagnosticSeverity.Information));
+                decorationOptions.push({ range: new vscode.Range(i, 0, i, 0), hoverMessage: s });
+            });
+            diagnosticCollection.set(document.uri, diagnostics);
+            editor.setDecorations(suggestionDecorationType, decorationOptions);
+        }, THROTTLE_DELAY);
     });
     context.subscriptions.push(changeDisposable);
 }
@@ -164,6 +177,9 @@ function registerCompletionProvider(context) {
     }, '.' // Trigger character
     );
     context.subscriptions.push(provider);
+}
+function shorten(text, maxLength = 80) {
+    return text.length > maxLength ? text.slice(0, maxLength) + '…' : text;
 }
 
 
