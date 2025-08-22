@@ -1,5 +1,12 @@
 import * as vscode from 'vscode';
-import { chat, ChatMessage, setApiKey, hasApiKey, AIResponse, analyzeAcademicPerformance, AcademicReport } from '../deepseek/client';
+import { chat, ChatMessage, setApiKey, hasApiKey } from '../deepseek/client';
+
+// Tipos y funciones auxiliares para análisis académico (stub temporal)
+type AcademicReport = any;
+
+async function analyzeAcademicPerformance(nombre_carrera: string, datos_notas: any): Promise<AcademicReport | { error: string }> {
+  return { error: 'Funcionalidad no disponible' };
+}
 
 export async function openChatPanel(context: vscode.ExtensionContext) {
   if (!hasApiKey()) {
@@ -51,8 +58,7 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
         }
 
         // Obtener respuesta de chat normal
-        const aiResponse = await chat(conversation);
-        const reply = formatAIResponse(aiResponse);
+        const reply = await chat(conversation);
         conversation.push({ role: 'assistant', content: reply });
         panel.webview.postMessage({
           command: 'replaceLastMessage',
@@ -77,42 +83,8 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
 }
 
 // ============================================
-// Formatear respuesta AI para mostrar
+// Formatear reportes académicos para mostrar
 // ============================================
-function formatAIResponse(response: AIResponse): string {
-  let result = response.content;
-
-  // Agregar metadata formateada
-  if (response.metadata) {
-    // Agregar dificultad si existe
-    if (response.metadata.difficulty) {
-      const difficultyMap = {
-        'beginner': 'Principiante',
-        'intermediate': 'Intermedio',
-        'advanced': 'Avanzado'
-      };
-      result += `\n\n(Dificultad: ${difficultyMap[response.metadata.difficulty] || response.metadata.difficulty})`;
-    }
-
-    // Agregar ejemplos si existen
-    if (response.metadata.examples && response.metadata.examples.length > 0) {
-      result += '\n\n📝 Ejemplos:';
-      response.metadata.examples.forEach((example, index) => {
-        result += `\n${index + 1}. ${example}`;
-      });
-    }
-
-    // Agregar tips si existen
-    if (response.metadata.tips && response.metadata.tips.length > 0) {
-      result += '\n\n💡 Tips:';
-      response.metadata.tips.forEach(tip => {
-        result += `\n• ${tip}`;
-      });
-    }
-  }
-
-  return result.trim();
-}
 
 function formatAcademicReport(report: AcademicReport | { error: string }): string {
   if ((report as any).error) {
