@@ -319,10 +319,7 @@ export async function chat(messages: ChatMessage[]): Promise<string> {
 
   } catch (error) {
     console.error('Error en chat:', error);
-    return JSON.stringify({
-      type: 'error',
-      content: `Error en el chat: ${(error as Error).message}`
-    });
+    return `Error en el chat: ${(error as Error).message}`;
   }
 }
 
