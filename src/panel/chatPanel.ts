@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { chat, ChatMessage, setApiKey, hasApiKey } from '../deepseek/client';
+import { removeMarkdown } from '../utils/removeMarkdown';
 
 // Tipos y funciones auxiliares para análisis académico (stub temporal)
 type AcademicReport = any;
@@ -52,7 +53,7 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
           panel.webview.postMessage({
             command: 'replaceLastMessage',
             who: 'assistant',
-            text: reply
+            text: removeMarkdown(reply)
           });
           return;
         }
@@ -63,7 +64,7 @@ export async function openChatPanel(context: vscode.ExtensionContext) {
         panel.webview.postMessage({
           command: 'replaceLastMessage',
           who: 'assistant',
-          text: reply
+          text: removeMarkdown(reply)
         });
 
       } catch (error) {
