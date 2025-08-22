@@ -323,6 +323,20 @@ Puedes incluir ejemplos de código corregido en el campo "content" usando format
         ];
     }
 }
+// Prompt para respuestas en texto plano
+function createTextPrompt(userMessage, level) {
+    return [
+        {
+            role: 'system',
+            content: `Eres un asistente experto en Python. ` +
+                `Responde en español latinoamericano de forma clara y didáctica. ` +
+                `Proporciona la respuesta en texto plano, sin utilizar formato JSON ni envoltorios. ` +
+                `Si detectas errores en el código o en la pregunta del usuario, explícalos y ofrece correcciones.` +
+                (level ? ` Nivel del usuario: ${level}.` : ''),
+        },
+        { role: 'user', content: userMessage }
+    ];
+}
 async function callApi(messages) {
     return new Promise((resolve) => {
         if (!apiKey) {
@@ -402,14 +416,14 @@ async function chat(messages) {
         // Obtener el último mensaje del usuario para contexto
         const lastUserMessage = messages[messages.length - 1];
         const userLevel = inferLevelFromConversation(messages);
-        // Crear prompt con formato JSON
-        const jsonMessages = createJSONPrompt(lastUserMessage?.content || '', userLevel, 'chat');
+        // Crear prompt en texto plano
+        const textPrompt = createTextPrompt(lastUserMessage?.content || '', userLevel);
         // Añadir contexto de conversación previa (sin el prompt de sistema)
         const conversationHistory = messages.slice(0, -1); // Todos menos el último
         const finalMessages = [
-            ...jsonMessages.slice(0, 1), // Sistema
+            textPrompt[0], // Sistema
             ...conversationHistory.slice(-4), // Últimos 4 mensajes de contexto
-            ...jsonMessages.slice(1) // Usuario actual
+            textPrompt[1] // Usuario actual
         ];
         const rawResponse = await callApi(finalMessages);
         const parsedResponse = parseAIResponse(rawResponse);
