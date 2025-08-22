@@ -31,8 +31,12 @@ export interface AIResponse {
     language?: string;
     difficulty?: 'beginner' | 'intermediate' | 'advanced';
     topic?: string;
+    concepts?: string[];
     examples?: string[];
-    tips?: string[];
+    exercises?: string[];
+    next_steps?: string[];
+    common_mistakes?: string[];
+    best_practices?: string[];
   };
 }
 
@@ -85,74 +89,108 @@ function parseAIResponse(rawResponse: string): AIResponse {
   };
 }
 
-// Función para crear prompts que soliciten JSON
-function createJSONPrompt(userMessage: string, level?: string, responseType: 'lesson' | 'chat' = 'chat'): Message[] {
-  const baseJSONInstruction = `
-
-IMPORTANTE: 
-- No incluyas texto fuera del JSON
-- El campo "content" debe contener toda la explicación principal
-- Usa "type": "code" si muestras código Python
-- Usa "type": "text" para explicaciones generales
-- Usa "type": "lesson" para contenido educativo estructurado
-- Usa "type": "error" si hay un problema
-
-Nivel del estudiante: ${level || 'principiante'}
-Responde en español latinoamericano, de manera clara y didáctica.
-`;
-
-  if (responseType === 'lesson') {
-    return [
-      {
-        role: 'system',
-        content: `${baseJSONInstruction}
-
-Eres un tutor experto en Python. Genera una lección estructurada para el nivel ${level}. 
-El tipo debe ser "lesson" y el contenido debe incluir explicaciones claras, ejemplos prácticos y ejercicios.`
-      },
-      {
-        role: 'user',
-        content: userMessage
-      }
-    ];
-  } else {
-    return [
-      {
-        role: 'system',
-        content: `${baseJSONInstruction}
-
-Eres un asistente experto en Python. Analiza el código o pregunta del estudiante y responde con:
-- "code" si estás mostrando código Python
-- "text" si es explicación general o conversación
-- "lesson" si es contenido educativo estructurado
-- "error" si hay un problema
-
-Si revisas código, identifica errores y explica cómo corregirlos. 
-Puedes incluir ejemplos de código corregido en el campo "content" usando formato markdown con triple backticks.`
-      },
-      {
-        role: 'user',
-        content: userMessage
-      }
-    ];
+// Función auxiliar para inferir el tema de la consulta
+function inferTopicFromQuery(query: string): string {
+  const queryLower = query.toLowerCase();
+  
+  if (queryLower.includes('variable') || queryLower.includes('asignación')) {
+    return 'variables y asignación';
+  } else if (queryLower.includes('función') || queryLower.includes('def ')) {
+    return 'funciones';
+  } else if (queryLower.includes('clase') || queryLower.includes('objeto')) {
+    return 'programación orientada a objetos';
+  } else if (queryLower.includes('lista') || queryLower.includes('array')) {
+    return 'estructuras de datos';
+  } else if (queryLower.includes('if') || queryLower.includes('condición')) {
+    return 'estructuras condicionales';
+  } else if (queryLower.includes('for') || queryLower.includes('while')) {
+    return 'bucles';
+  } else if (queryLower.includes('error') || queryLower.includes('excepción')) {
+    return 'manejo de errores';
+  } else if (queryLower.includes('import') || queryLower.includes('módulo')) {
+    return 'módulos y paquetes';
   }
+  
+  return 'conceptos generales de Python';
 }
 
-// Prompt para respuestas en texto plano
-function createTextPrompt(userMessage: string, level?: string): Message[] {
-  return [
+// Construir el prompt mejorado para el modelo con instrucciones JSON
+const createProgrammingPrompt = (userQuery: string, context: {
+  level: string;
+  previousMessages?: Message[];
+  codeSnippet?: string;
+  specificTopic?: string;
+}): Message[] => {
+  const { level, previousMessages, codeSnippet, specificTopic } = context;
+  
+  const topic = specificTopic || inferTopicFromQuery(userQuery);
+  
+  const promptContent = (
+    `Eres un tutor experto en programación Python especializado en enseñar desde conceptos básicos hasta avanzados. `
+    + `Tu objetivo es ayudar a estudiantes a desarrollar su lógica de programación y estructura de código. `
+    + `Debes explicar paso a paso, de manera clara y didáctica, adaptándote al nivel ${level} del estudiante.`
+    + `\n\nANÁLISIS REQUERIDO:\n`
+    + `1. Evaluar el nivel de comprensión del estudiante\n`
+    + `2. Identificar conceptos clave que necesita reforzar\n`
+    + `3. Proponer ejercicios progresivos adecuados a su nivel\n`
+    + `4. Explicar patrones de código y buenas prácticas\n`
+    + `5. Sugerir recursos de aprendizaje específicos\n`
+    + `\nIMPORTANTE: Tu respuesta DEBE ser un JSON válido con la siguiente estructura:\n`
+    + `{\n`
+    + `  "type": "lesson|code|text|error",\n`
+    + `  "content": "string",\n`
+    + `  "metadata": {\n`
+    + `    "language": "python",\n`
+    + `    "difficulty": "beginner|intermediate|advanced",\n`
+    + `    "topic": "string",\n`
+    + `    "concepts": ["string"],\n`
+    + `    "examples": ["string"],\n`
+    + `    "exercises": ["string"],\n`
+    + `    "next_steps": ["string"],\n`
+    + `    "common_mistakes": ["string"],\n`
+    + `    "best_practices": ["string"]\n`
+    + `  }\n`
+    + `}\n\n`
+    + `CONTEXTO DEL ESTUDIANTE:\n`
+    + `• Nivel: ${level}\n`
+    + `• Tema específico: ${topic}\n`
+    + `• Código proporcionado: ${codeSnippet ? 'Sí' : 'No'}\n\n`
+    + `CONSULTA DEL ESTUDIANTE:\n${userQuery}`
+  );
+
+  const messages: Message[] = [
     {
-      role: 'system',
-      content:
-        `Eres un asistente experto en Python. ` +
-        `Responde en español latinoamericano de forma clara y didáctica. ` +
-        `Proporciona la respuesta en texto plano, sin utilizar formato JSON ni envoltorios. ` +
-        `Si detectas errores en el código o en la pregunta del usuario, explícalos y ofrece correcciones.` +
-        (level ? ` Nivel del usuario: ${level}.` : ''),
+      role: "system",
+      content: (
+        "Eres un tutor experto en Python con amplia experiencia en enseñanza programática. "
+        + "Tu enfoque debe ser pedagógico, paciente y constructivo. "
+        + "Explica conceptos complejos de manera simple usando analogías y ejemplos prácticos. "
+        + "Fomenta el aprendizaje progresivo desde 'print(\"Hola mundo\")' hasta proyectos complejos. "
+        + "\n\nOBLIGATORIO: Responde SIEMPRE en formato JSON válido con la estructura especificada. "
+        + "No incluyas texto adicional fuera del JSON. "
+        + "Asegúrate de que el JSON sea válido y completo. "
+        + "Usa español latinoamericano claro y accesible."
+      )
     },
-    { role: 'user', content: userMessage }
+    {
+      role: "user",
+      content: promptContent
+    }
   ];
-}
+
+  // Añadir historial de conversación si existe
+  if (previousMessages && previousMessages.length > 0) {
+    // Mantener solo los últimos 3 mensajes para contexto (excluyendo mensajes de sistema)
+    const recentMessages = previousMessages
+      .filter(msg => msg.role !== 'system')
+      .slice(-3);
+    
+    // Insertar después del mensaje de sistema
+    messages.splice(1, 0, ...recentMessages);
+  }
+
+  return messages;
+};
 
 async function callApi(messages: Message[]): Promise<string> {
   return new Promise((resolve) => {
@@ -168,6 +206,11 @@ async function callApi(messages: Message[]): Promise<string> {
       model: MODEL,
       messages,
       stream: false,
+      temperature: 0.2, // Baja temperatura para respuestas más precisas
+      max_tokens: 2048,
+      top_p: 0.9,
+      frequency_penalty: 0.1,
+      presence_penalty: 0.1
     });
 
     const options = {
@@ -226,8 +269,27 @@ async function callApi(messages: Message[]): Promise<string> {
   });
 }
 
+export async function getProgrammingHelp(
+  userQuery: string, 
+  level: string = 'beginner', 
+  codeSnippet?: string
+): Promise<AIResponse> {
+  const messages = createProgrammingPrompt(userQuery, {
+    level,
+    codeSnippet,
+    specificTopic: inferTopicFromQuery(userQuery)
+  });
+
+  const rawResponse = await callApi(messages);
+  return parseAIResponse(rawResponse);
+}
+
 export async function getSuggestions(code: string): Promise<string[]> {
-  const messages = createJSONPrompt(`Revisa este código de Python: ${code}`, 'intermediate', 'chat');
+  const messages = createProgrammingPrompt(
+    `Revisa este código de Python y proporciona sugerencias de mejora: ${code}`,
+    { level: 'intermedio', codeSnippet: code }
+  );
+  
   const response = await callApi(messages);
   const parsedResponse = parseAIResponse(response);
   return [formatResponseForDisplay(parsedResponse)];
@@ -235,36 +297,32 @@ export async function getSuggestions(code: string): Promise<string[]> {
 
 export type ChatMessage = Message;
 
-// ✅ FUNCIÓN PRINCIPAL CORREGIDA
-export async function chat(messages: ChatMessage[]): Promise<AIResponse> {
+export async function chat(messages: ChatMessage[]): Promise<string> {
   try {
     // Obtener el último mensaje del usuario para contexto
     const lastUserMessage = messages[messages.length - 1];
     const userLevel = inferLevelFromConversation(messages);
 
-    // Crear prompt en texto plano
-    const textPrompt = createTextPrompt(lastUserMessage?.content || '', userLevel);
+    // Crear prompt con el nuevo formato
+    const programmingMessages = createProgrammingPrompt(
+      lastUserMessage?.content || '',
+      { 
+        level: userLevel,
+        previousMessages: messages
+      }
+    );
 
-    // Añadir contexto de conversación previa (sin el prompt de sistema)
-    const conversationHistory = messages.slice(0, -1); // Todos menos el último
-    const finalMessages = [
-      textPrompt[0], // Sistema
-      ...conversationHistory.slice(-4), // Últimos 4 mensajes de contexto
-      textPrompt[1] // Usuario actual
-    ];
-
-    const rawResponse = await callApi(finalMessages);
+    const rawResponse = await callApi(programmingMessages);
     const parsedResponse = parseAIResponse(rawResponse);
 
-    // ✅ Devolver el objeto AIResponse directamente, no como string
-    return parsedResponse;
+    return formatResponseForDisplay(parsedResponse);
 
   } catch (error) {
     console.error('Error en chat:', error);
-    return {
+    return JSON.stringify({
       type: 'error',
       content: `Error en el chat: ${(error as Error).message}`
-    };
+    });
   }
 }
 
@@ -300,7 +358,7 @@ Incluye ejemplos de código y consejos útiles.`
 - Un ejercicio práctico con clase
 Incluye ejemplos de código y mejores prácticas.`;
 
-    const messages = createJSONPrompt(lessonPrompt, normalizedLevel, 'lesson');
+    const messages = createProgrammingPrompt(lessonPrompt, { level: normalizedLevel });
     const rawResponse = await callApi(messages);
     const parsedResponse = parseAIResponse(rawResponse);
 
@@ -314,9 +372,9 @@ Incluye ejemplos de código y mejores prácticas.`;
 
     // Fallback a lecciones estáticas
     const fallbackLessons = {
-      principiante: `# 🐍 Lección de Python - Nivel Principiante`,
+      principiante: `# 🐍 Lección de Python - Nivel Principiante\n\n## Conceptos Básicos\n\nPython es un lenguaje de programación fácil de aprender con una sintaxis clara y legible.\n\n### Hola Mundo\n\n\`\`\`python\nprint("¡Hola Mundo!")\n\`\`\`\n\n### Variables\n\n\`\`\`python\n# Declarar variables\nnombre = "Ana"\nedad = 25\nestatura = 1.65\n\nprint(f"Me llamo {nombre}, tengo {edad} años y mido {estatura}m")\n\`\`\``,
 
-      intermedio: `# 🐍 Lección de Python - Nivel Intermedio`
+      intermedio: `# 🐍 Lección de Python - Nivel Intermedio\n\n## Funciones y Estructuras de Datos\n\n### Funciones\n\n\`\`\`python\ndef saludar(nombre):\n    return f"¡Hola {nombre}!"\n\n# Llamar a la función\nmensaje = saludar("Carlos")\nprint(mensaje)\n\`\`\`\n\n### Listas y Diccionarios\n\n\`\`\`python\n# Lista\nfrutas = ["manzana", "banana", "naranja"]\nfrutas.append("uva")\n\n# Diccionario\npersona = {\n    "nombre": "Ana",\n    "edad": 25,\n    "ciudad": "Madrid"\n}\n\nprint(frutas[0])  # manzana\nprint(persona["nombre"])  # Ana\n\`\`\``
     };
 
     return fallbackLessons[normalizedLevel as keyof typeof fallbackLessons] ||
@@ -329,183 +387,84 @@ function inferLevelFromConversation(messages: ChatMessage[]): string {
   // Buscar indicadores de nivel en los mensajes
   const conversationText = messages.map(m => m.content).join(' ').toLowerCase();
 
-  if (conversationText.includes('principiante') || conversationText.includes('beginner')) {
-    return 'principiante';
+  if (conversationText.includes('avanzado') || conversationText.includes('advanced')) {
+    return 'avanzado';
   }
   if (conversationText.includes('intermedio') || conversationText.includes('intermediate')) {
     return 'intermedio';
+  }
+  if (conversationText.includes('principiante') || conversationText.includes('beginner') || conversationText.includes('básico')) {
+    return 'principiante';
   }
 
   // Por defecto, asumir principiante
   return 'principiante';
 }
 
-// ✅ FUNCIÓN DE FORMATEO MEJORADA
+// Función para formatear respuesta para mostrar
 function formatResponseForDisplay(response: AIResponse): string {
-  let result = response.content;
+  switch (response.type) {
+    case 'code':
+      let codeFormatted = response.content;
+      if (response.metadata?.language && !codeFormatted.includes('```')) {
+        codeFormatted = `\`\`\`${response.metadata.language}\n${codeFormatted}\n\`\`\``;
+      }
+      return codeFormatted;
 
-  // Agregar metadata formateada
-  if (response.metadata) {
-    // Agregar dificultad si existe
-    if (response.metadata.difficulty) {
-      const difficultyMap = {
-        'beginner': 'Principiante',
-        'intermediate': 'Intermedio',
-        'advanced': 'Avanzado'
-      };
-      result += `\n\n(Dificultad: ${difficultyMap[response.metadata.difficulty] || response.metadata.difficulty})`;
-    }
+    case 'lesson':
+      let lessonFormatted = response.content;
 
-    // Agregar ejemplos si existen
-    if (response.metadata.examples && response.metadata.examples.length > 0) {
-      result += '\n\n📝 Ejemplos:';
-      response.metadata.examples.forEach((example, index) => {
-        result += `\n${index + 1}. ${example}`;
-      });
-    }
+      // Agregar metadatos educativos si existen
+      if (response.metadata) {
+        if (response.metadata.concepts && response.metadata.concepts.length > 0) {
+          lessonFormatted += '\n\n## 🧠 Conceptos Clave:\n';
+          response.metadata.concepts.forEach(concept => {
+            lessonFormatted += `\n- ${concept}`;
+          });
+        }
 
-    // Agregar tips si existen
-    if (response.metadata.tips && response.metadata.tips.length > 0) {
-      result += '\n\n💡 Tips:';
-      response.metadata.tips.forEach(tip => {
-        result += `\n• ${tip}`;
-      });
-    }
-  }
+        if (response.metadata.examples && response.metadata.examples.length > 0) {
+          lessonFormatted += '\n\n## 📝 Ejemplos de Código:\n';
+          response.metadata.examples.forEach((example, index) => {
+            lessonFormatted += `\n${index + 1}. \`\`\`python\n${example}\n\`\`\``;
+          });
+        }
 
-  return result.trim();
-}
+        if (response.metadata.exercises && response.metadata.exercises.length > 0) {
+          lessonFormatted += '\n\n## 💪 Ejercicios Prácticos:\n';
+          response.metadata.exercises.forEach((exercise, index) => {
+            lessonFormatted += `\n${index + 1}. ${exercise}`;
+          });
+        }
 
-// =============================================================
-//  Nuevos tipos para análisis académico
-// =============================================================
+        if (response.metadata.best_practices && response.metadata.best_practices.length > 0) {
+          lessonFormatted += '\n\n## ✅ Mejores Prácticas:\n';
+          response.metadata.best_practices.forEach(practice => {
+            lessonFormatted += `\n- ${practice}`;
+          });
+        }
 
-export interface StudentActivity {
-  nombre: string;
-  nota: number;
-  max_nota: number;
-  porcentaje: number;
-  tipo: string;
-  comentario: string;
-}
+        if (response.metadata.common_mistakes && response.metadata.common_mistakes.length > 0) {
+          lessonFormatted += '\n\n## ⚠️ Errores Comunes:\n';
+          response.metadata.common_mistakes.forEach(mistake => {
+            lessonFormatted += `\n- ${mistake}`;
+          });
+        }
 
-export interface StudentRecord {
-  nombre_estudiante: string;
-  curso: string;
-  promedio?: number;
-  actividades_con_nota?: number;
-  total_actividades?: number;
-  actividades?: StudentActivity[];
-}
+        if (response.metadata.next_steps && response.metadata.next_steps.length > 0) {
+          lessonFormatted += '\n\n## 🚀 Próximos Pasos:\n';
+          response.metadata.next_steps.forEach(step => {
+            lessonFormatted += `\n- ${step}`;
+          });
+        }
+      }
 
-export interface AcademicReport {
-  resumen_general: {
-    promedio_grupo: number;
-    total_estudiantes: number;
-    nivel_riesgo_grupo: string;
-    estado_general_grupo: string;
-  };
-  estudiantes: any[];
-  recomendaciones_grupales: {
-    mejoras_metodologicas: string[];
-    recursos_sugeridos: string[];
-    actividades_complementarias: string[];
-  };
-  [key: string]: any;
-}
+      return lessonFormatted;
 
-// Construcción del prompt avanzado para análisis FODA
-function buildAcademicPrompt(nombreCarrera: string, datosNotas: StudentRecord[]): string {
-  let prompt = (
-    `Analizar detalladamente el desempeño académico de los estudiantes en la asignatura de ${nombreCarrera}. ` +
-    `Utilizar como fuente de información las actividades registradas en la plataforma institucional LMS UIDE Canvas. ` +
-    `Realizar un análisis FODA (Fortalezas, Oportunidades, Debilidades y Amenazas) basado en sus resultados, ` +
-    `rúbricas de evaluación, comentarios recibidos, participación y progreso en cada componente. ` +
-    `Presentar los hallazgos de forma clara, estructurada y categorizada por estudiante. ` +
-    `Incluir recomendaciones específicas y accionables, orientadas a mejorar el proceso de enseñanza-aprendizaje, ` +
-    `tanto a nivel individual como grupal.` +
-    "\n\nIMPORTANTE: Tu respuesta DEBE ser un JSON válido con la siguiente estructura:\n" +
-    "{\n" +
-    '  "resumen_general": {\n' +
-    '    "promedio_grupo": 0,\n' +
-    '    "total_estudiantes": 0,\n' +
-    '    "nivel_riesgo_grupo": "string",\n' +
-    '    "estado_general_grupo": "string"\n' +
-    '  },\n' +
-    '  "estudiantes": [\n' +
-    '    {\n' +
-    '      "nombre": "string",\n' +
-    '      "curso": "string",\n' +
-    '      "promedio": 0,\n' +
-    '      "nivel_riesgo": "string",\n' +
-    '      "estado_general": "string",\n' +
-    '      "probabilidad_aprobacion": 0,\n' +
-    '      "analisis_especifico": {\n' +
-    '        "fortalezas": ["string"],\n' +
-    '        "debilidades": ["string"],\n' +
-    '        "oportunidades": ["string"],\n' +
-    '        "amenazas": ["string"]\n' +
-    '      },\n' +
-    '      "recomendaciones": {\n' +
-    '        "inmediatas": ["string"],\n' +
-    '        "corto_plazo": ["string"],\n' +
-    '        "largo_plazo": ["string"]\n' +
-    '      },\n' +
-    '      "objetivo_recomendado": "string",\n' +
-    '      "estrategia_sugerida": "string",\n' +
-    '      "actividades_destacadas": [\n' +
-    '        {\n' +
-    '          "nombre": "string",\n' +
-    '          "nota": 0,\n' +
-    '          "max_nota": 0,\n' +
-    '          "porcentaje": 0,\n' +
-    '          "tipo": "string",\n' +
-    '          "comentario": "string"\n' +
-    '        }\n' +
-    '      ]\n' +
-    '    }\n' +
-    '  ],\n' +
-    '  "recomendaciones_grupales": {\n' +
-    '    "mejoras_metodologicas": ["string"],\n' +
-    '    "recursos_sugeridos": ["string"],\n' +
-    '    "actividades_complementarias": ["string"]\n' +
-    '  }\n' +
-    "}\n\n" +
-    "DATOS DEL ESTUDIANTE:\n"
-  );
+    case 'error':
+      return `❌ **Error**: ${response.content}`;
 
-  for (const estudiante of datosNotas) {
-    prompt += `\n👤 ESTUDIANTE: ${estudiante.nombre_estudiante}\n`;
-    prompt += `📘 CURSO: ${estudiante.curso}\n`;
-    prompt += `📊 PROMEDIO ACTUAL: ${estudiante.promedio ?? 0}%\n`;
-    prompt += `📝 ACTIVIDADES EVALUADAS: ${estudiante.actividades_con_nota ?? 0}/${estudiante.total_actividades ?? 0}\n\n`;
-    prompt += '📋 DETALLE DE ACTIVIDADES:\n';
-    for (const act of estudiante.actividades || []) {
-      const porcentaje = act.nota != null && act.max_nota ? (act.nota / act.max_nota) * 100 : 0;
-      prompt += `  • ${act.nombre} (${act.tipo.toUpperCase()}): ${act.nota ?? 'N/A'}/${act.max_nota ?? 'N/A'} (${Math.round(porcentaje * 10) / 10}%)\n`;
-    }
-    prompt += '\n';
-  }
-
-  return prompt;
-}
-
-const systemAcademicPrompt =
-  'Eres un experto analista educativo especializado en evaluación del rendimiento académico universitario. ' +
-  'Tu análisis debe ser preciso, constructivo y motivacional. Utiliza un lenguaje claro y profesional, ' +
-  'pero accesible para estudiantes y docentes. \n\nOBLIGATORIO: Tu respuesta DEBE ser un JSON válido con la estructura especificada. ' +
-  'No incluyas texto adicional fuera del JSON. Asegúrate de que el JSON sea válido y completo.';
-
-export async function analyzeAcademicPerformance(nombreCarrera: string, datosNotas: StudentRecord[]): Promise<AcademicReport | { error: string }> {
-  try {
-    const userPrompt = buildAcademicPrompt(nombreCarrera, datosNotas);
-    const messages: Message[] = [
-      { role: 'system', content: systemAcademicPrompt },
-      { role: 'user', content: userPrompt }
-    ];
-    const raw = await callApi(messages);
-    return JSON.parse(raw);
-  } catch (error) {
-    return { error: `Error en el análisis: ${(error as Error).message}` };
+    default:
+      return response.content;
   }
 }
