@@ -37,10 +37,15 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const liveEditorListener_1 = require("./listener/liveEditorListener");
+const examplePanel_1 = require("./panel/examplePanel");
+const TutorViewProvider_1 = require("./views/TutorViewProvider");
 function activate(context) {
     console.log('AI Helper activado');
     (0, liveEditorListener_1.startLiveListener)(context);
     (0, liveEditorListener_1.registerCompletionProvider)(context);
+    const tutorProvider = new TutorViewProvider_1.TutorViewProvider(context);
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(TutorViewProvider_1.TutorViewProvider.viewType, tutorProvider));
+    context.subscriptions.push(vscode.commands.registerCommand('ai-mechanic.openExampleValidator', () => (0, examplePanel_1.openExamplePanel)(context)));
     vscode.window.showInformationMessage('AI Helper listo con DeepSeek!');
 }
 function deactivate() { }

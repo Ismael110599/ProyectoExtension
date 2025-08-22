@@ -61,24 +61,59 @@ function validateAIResponse(obj: any): obj is AIResponse {
   );
 }
 
+// Intentar extraer un JSON válido de un texto que pueda incluir
+// bloques de código o contenido adicional
+function extractJSONFromText(text: string): string | null {
+  // Buscar JSON envuelto en bloque ```json
+  const fencedMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fencedMatch) {
+    return fencedMatch[1];
+  }
+
+  // Buscar el primer objeto JSON plausible en el texto
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    return text.slice(start, end + 1);
+  }
+
+  return null;
+}
+
 // Función para parsear respuesta de la AI
 function parseAIResponse(rawResponse: string): AIResponse {
-  // Intentar parsear como JSON
-  if (isValidJSON(rawResponse)) {
+  const tryParse = (text: string): AIResponse | null => {
+    if (!isValidJSON(text)) {
+      return null;
+    }
     try {
-      const parsed = JSON.parse(rawResponse);
+      const parsed = JSON.parse(text);
       if (validateAIResponse(parsed)) {
         return parsed;
-      } else {
-        console.warn('Respuesta JSON no tiene la estructura esperada:', parsed);
-        // Fallback: convertir a formato esperado
-        return {
-          type: 'text',
-          content: typeof parsed === 'string' ? parsed : rawResponse
-        };
       }
+      console.warn('Respuesta JSON no tiene la estructura esperada:', parsed);
+      return {
+        type: 'text',
+        content: typeof parsed === 'string' ? parsed : rawResponse
+      };
     } catch (error) {
       console.error('Error al parsear JSON:', error);
+      return null;
+    }
+  };
+
+  // Primer intento con la respuesta directa
+  const direct = tryParse(rawResponse.trim());
+  if (direct) {
+    return direct;
+  }
+
+  // Intentar extraer JSON de bloques de código u otras formas
+  const extracted = extractJSONFromText(rawResponse);
+  if (extracted) {
+    const parsed = tryParse(extracted);
+    if (parsed) {
+      return parsed;
     }
   }
 
@@ -167,7 +202,7 @@ const createProgrammingPrompt = (userQuery: string, context: {
         + "Explica conceptos complejos de manera simple usando analogías y ejemplos prácticos. "
         + "Fomenta el aprendizaje progresivo desde 'print(\"Hola mundo\")' hasta proyectos complejos. "
         + "\n\nOBLIGATORIO: Responde SIEMPRE en formato JSON válido con la estructura especificada. "
-        + "No incluyas texto adicional fuera del JSON. "
+        + "No incluyas texto adicional fuera del JSON ni utilices bloques de código (```). "
         + "Asegúrate de que el JSON sea válido y completo. "
         + "Usa español latinoamericano claro y accesible."
       )
