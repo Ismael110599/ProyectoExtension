@@ -264,10 +264,21 @@ function getWebviewContent(): string {
       }
     });
 
+    function formatContent(text) {
+      try {
+        const parsed = JSON.parse(text);
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(parsed, null, 2);
+        return pre;
+      } catch {
+        return document.createTextNode(text);
+      }
+    }
+
     function appendMessage(who, text, isProcessing = false) {
       const container = document.createElement('div');
       container.className = 'message ' + who + (isProcessing ? ' processing' : '');
-      container.textContent = text;
+      container.appendChild(formatContent(text));
       messagesDiv.appendChild(container);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
@@ -277,7 +288,8 @@ function getWebviewContent(): string {
       const lastMessage = messages[messages.length - 1];
 
       if (lastMessage) {
-        lastMessage.textContent = text;
+        lastMessage.innerHTML = '';
+        lastMessage.appendChild(formatContent(text));
         lastMessage.className = 'message ' + who; // Remover clase 'processing'
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       } else {
