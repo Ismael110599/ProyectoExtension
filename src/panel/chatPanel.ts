@@ -197,61 +197,63 @@ function getWebviewContent(): string {
       display: flex;
       flex-direction: column;
       height: 100vh;
+      background: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
     }
     #messages {
       flex: 1;
-      border: 1px solid #ccc;
+      border: 1px solid var(--vscode-editorWidget-border);
       overflow-y: auto;
       padding: 10px;
-      background: #1e1e1e;
-      color: #dcdcdc;
+      background: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
     }
     .message { 
       margin: 10px 0; 
       white-space: pre-wrap; 
       line-height: 1.5;
     }
-    .user { 
-      color: #4fc3f7; 
+    .user {
+      color: var(--vscode-textLink-foreground);
       font-weight: bold;
     }
-    .assistant { 
-      color: #81c784; 
+    .assistant {
+      color: var(--vscode-charts-green);
     }
     .processing {
-      color: #ffa726;
+      color: var(--vscode-descriptionForeground);
       font-style: italic;
     }
     #input {
       display: flex;
       padding: 10px;
-      background: #252525;
+      background: var(--vscode-editor-background);
     }
     #input input {
       flex: 1;
       padding: 8px;
-      background: #333;
-      color: #fff;
-      border: none;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border);
       outline: none;
       border-radius: 4px;
     }
     #input button {
       margin-left: 10px;
-      background: #4fc3f7;
+      background: var(--vscode-button-background);
       border: none;
-      color: #000;
+      color: var(--vscode-button-foreground);
       padding: 8px 12px;
       cursor: pointer;
       border-radius: 4px;
     }
     #input button:hover {
-      background: #29b6f6;
+      background: var(--vscode-button-hoverBackground);
     }
   </style>
 </head>
 <body>
-  <h3 style="padding:10px;background:#222;margin:0;color:#fff">💬 Chat con AI</h3>
+  <h3 style="padding:10px;margin:0;background:var(--vscode-editor-background);color:var(--vscode-editor-foreground)">💬 Chat con AI</h3>
   <div id="messages"></div>
   <div id="input">
     <input id="text" type="text" placeholder="Escribe un mensaje..." />
